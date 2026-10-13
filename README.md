@@ -485,7 +485,7 @@ Microsoft blocks SMTP on personal accounts. Use Graph API instead:
 
 Get your token in 1 minute with device code flow. See [Account Setup Guide](docs/account-setup.md).
 
-## 32 MCP Tools
+## 37 MCP Tools
 
 ### Read (10 tools)
 
@@ -535,6 +535,28 @@ Get your token in 1 minute with device code flow. See [Account Setup Guide](docs
 | `ews_search_messages` | Search emails via EWS (inbox, sent, drafts, etc.) |
 | `ews_get_message` | Get full email content via EWS |
 | `ews_send_message` | Send email via EWS |
+
+### Drafts (5 tools)
+
+The agent prepares the email, a person reviews it in their mail client (or
+asks the agent to send it). One set of tools for every account: drafts go to
+the IMAP Drafts folder, or through EWS or Microsoft Graph when the account is
+configured for them (`list_all_accounts` shows `drafts_with`).
+
+| Tool | What it does |
+|------|-------------|
+| `draft_create` | Save a new draft (CC/BCC, HTML, attachments, threading) |
+| `draft_update` | Replace a draft's content; returns a new `draft_id` |
+| `draft_send` | Send a draft and remove it from Drafts |
+| `draft_delete` | Delete a draft (only drafts; needs `confirm: true`) |
+| `draft_list` | List drafts, newest first |
+
+Enable with `MAIL_DRAFTS_ENABLED=true`. It is independent of
+`MAIL_IMAP_WRITE_ENABLED`: with only drafts enabled, the agent can write
+drafts but cannot move, flag or delete other mail, and every draft tool
+refuses ids that are not drafts. `draft_send` additionally needs
+`MAIL_SMTP_WRITE_ENABLED=true`. Graph accounts need the `Mail.ReadWrite`
+scope.
 
 ### Attachments
 
@@ -619,6 +641,7 @@ Use `account_id` in tool calls: `"account_id": "gmail"`, `"account_id": "icloud"
 - **Passwords in SecretString** — never logged or returned in responses
 - **Write operations gated** — require explicit `MAIL_IMAP_WRITE_ENABLED=true`
 - **Send operations gated** — require explicit `MAIL_SMTP_WRITE_ENABLED=true`
+- **Drafts gated separately** — `MAIL_DRAFTS_ENABLED=true` allows writing drafts without any other write access
 - **Delete confirmation** — requires `confirm: true`
 - **HTML sanitized** with ammonia (prevents XSS)
 - **Bounded outputs** — body text, HTML, attachments truncated to configurable limits
@@ -687,6 +710,7 @@ Use `account_id` in tool calls: `"account_id": "gmail"`, `"account_id": "icloud"
 |----------|---------|-------------|
 | `MAIL_IMAP_WRITE_ENABLED` | false | Enable IMAP write operations |
 | `MAIL_SMTP_WRITE_ENABLED` | false | Enable SMTP/Graph send operations |
+| `MAIL_DRAFTS_ENABLED` | false | Enable the draft tools (`draft_send` also needs `MAIL_SMTP_WRITE_ENABLED`) |
 | `MAIL_SMTP_SAVE_SENT` | false | Save sent emails to IMAP Sent folder (enable if your provider doesn't auto-save on send — e.g. Gmail does, Zoho doesn't always) |
 | `MAIL_SMTP_CONNECT_TIMEOUT_MS` | 30000 | SMTP TCP/TLS/auth timeout (connect phase) |
 | `MAIL_SMTP_SEND_TIMEOUT_MS` | 300000 | SMTP DATA transmission timeout (5 min — accommodates large attachments) |

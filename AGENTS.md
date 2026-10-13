@@ -146,6 +146,7 @@ The repository publishes GitHub Release archives/installers via cargo-dist.
 - `src/mime.rs`: message parsing, header/body extraction, sanitization.
 - `src/message_id.rs`: stable message id parse/encode logic.
 - `src/pagination.rs`: cursor storage and TTL/eviction behavior.
+- `src/server/drafts.rs`: draft tools and their IMAP/EWS/Graph routing.
 
 ## Code Style Guidelines
 
@@ -236,6 +237,13 @@ The repository publishes GitHub Release archives/installers via cargo-dist.
 - `MAIL_IMAP_MAX_MAILBOXES`: cap on how many mailboxes `imap_list_mailboxes`
   returns (default `200`, clamped to `1..=10000`). The response always carries
   `total` and `truncated`, so a client can tell a capped list from a complete one.
+- `MAIL_DRAFTS_ENABLED`: enables the `draft_*` tools (default `false`).
+  Independent of `MAIL_IMAP_WRITE_ENABLED` by design: drafts-only must not
+  grant move/delete/flag on other mail, so every draft operation on an
+  existing `draft_id` checks the target is a draft (IMAP Drafts folder, EWS
+  `IsDraft`, Graph `isDraft`). `draft_send` also requires
+  `MAIL_SMTP_WRITE_ENABLED`. Backend per account: EWS config, else Graph
+  config (`MAIL_GRAPH_*` only, never the generic `MAIL_OAUTH2_*`), else IMAP.
 - `MAIL_IMAP_SEARCH_CONCURRENCY`: parallel IMAP connections used by
   `imap_search_all_mailboxes` (default `4`, clamped to `1..=8`). Each connection
   walks its share of the mailboxes with EXAMINE + UID SEARCH; providers cap

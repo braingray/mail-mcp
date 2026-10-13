@@ -333,7 +333,7 @@ If the public Client ID stops working or your organization blocks it, register y
 2. Click **"Add a permission"** → **"Microsoft Graph"** → **"Delegated permissions"**
 3. Add these permissions:
    - `Mail.Send` — send emails via Graph API
-   - `Mail.ReadWrite` — read/write mailbox (optional, for future features)
+   - `Mail.ReadWrite` — read/write mailbox (required for the draft tools)
    - `IMAP.AccessAsUser.All` — IMAP access (only needed if using OAuth2 for IMAP too)
 4. Click **"Add permissions"**
 5. If you see "Admin consent required": ask your admin to click **"Grant admin consent"**

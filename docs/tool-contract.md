@@ -367,6 +367,49 @@ Output `data`:
 - `steps_attempted`: integer
 - `steps_succeeded`: integer
 
+### 11) Draft tools: `draft_create`, `draft_update`, `draft_send`, `draft_delete`, `draft_list`
+
+Purpose: let an agent prepare email for a person to review, on any account type.
+
+Gate: all five require `MAIL_DRAFTS_ENABLED=true`, independent of `MAIL_IMAP_WRITE_ENABLED`. `draft_send` also requires `MAIL_SMTP_WRITE_ENABLED=true`.
+
+Backend (per account, reported as `drafts_with` by `list_all_accounts` and as `backend` in every response):
+- `ews` when the account has an EWS config (`MAIL_EWS_<ID>_*`)
+- else `graph` when it has a Graph config (`MAIL_GRAPH_<ID>_*`; needs the `Mail.ReadWrite` scope)
+- else `imap` (drafts in the IMAP Drafts folder; sending needs an SMTP config)
+
+`draft_id`:
+- IMAP: the regular `message_id` of the draft in the Drafts folder (works with `imap_get_message`)
+- EWS: the EWS `ItemId` (works with `ews_get_message`)
+- Graph: the Graph message id
+- IMAP ids are rejected on EWS/Graph accounts.
+
+Guard: every operation on an existing `draft_id` checks that it is a draft before acting (IMAP: the message is in the Drafts folder and still exists; EWS: `IsDraft`; Graph: `isDraft`). A non-draft id fails with `invalid_input`; a missing one with `not_found`.
+
+`draft_create` input:
+- `account_id` (optional)
+- `to` (1..50), `cc?`, `bcc?` (max 50 each)
+- `subject` (1..998 chars)
+- `body_text?`, `body_html?` (at least one)
+- `reply_to?`, `in_reply_to?`, `references?`
+- `attachments?` (same shape as the send tools)
+
+Output `data`: `status` (`ok|partial`), `issues`, `account_id`, `backend`, `draft_id` (null with `partial` when an IMAP draft was saved but could not be found again), `message_id` (RFC 5322 Message-ID; IMAP only).
+
+`draft_update` input: `account_id`, `draft_id`, and the same fields as `draft_create`. Full replacement: attachments not listed again are dropped. The new version is created first and the old one deleted second, so a failure in between leaves two drafts, never none (`status: partial`, `previous_draft_removed: false`).
+
+Output `data`: `status`, `issues`, `account_id`, `backend`, `draft_id` (new), `previous_draft_id`, `previous_draft_removed`, `message_id`.
+
+`draft_send` input: `account_id`, `draft_id`.
+- IMAP: sends the stored bytes through SMTP with `Bcc` removed and `Date` refreshed (envelope from `From`, `To`, `Cc`, `Bcc`), archives them to Sent when `should_save_sent` applies, then removes the draft. Failures after the message is sent are reported in `issues` (`status: partial`), never raised, so the caller does not send twice.
+- EWS: `SendItem`, saved to Sent Items. Graph: `/send`, filed in Sent Items.
+
+Output `data`: `status`, `issues`, `account_id`, `backend`, `draft_id`, `message_id` (IMAP), `recipients_count` (IMAP), `saved_to_sent`, `draft_removed`.
+
+`draft_delete` input: `account_id`, `draft_id`, `confirm` (required literal `true`).
+
+`draft_list` input: `account_id`, `limit?` (1..50, default 20). Output `data`: `status`, `issues`, `account_id`, `backend`, `returned`, `drafts[]` with `draft_id`, `subject`, `to`, `cc`, `date`.
+
 ## Security and Guardrails
 
 - Never return secrets (`*_PASS`, tokens, cookies, auth headers).
@@ -389,6 +432,7 @@ Per account:
 Server-wide:
 
 - `MAIL_IMAP_WRITE_ENABLED` (default `false`)
+- `MAIL_DRAFTS_ENABLED` (default `false`): enables the draft tools; `draft_send` also needs `MAIL_SMTP_WRITE_ENABLED`
 - `MAIL_IMAP_CONNECT_TIMEOUT_MS` (default `30000`)
 - `MAIL_IMAP_GREETING_TIMEOUT_MS` (default `15000`)
 - `MAIL_IMAP_SOCKET_TIMEOUT_MS` (default `300000`)
