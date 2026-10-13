@@ -1359,6 +1359,7 @@ mod tests {
             smtp_connect_timeout_ms: 30_000,
             smtp_send_timeout_ms: 300_000,
             write_enabled: true,
+            drafts_enabled: true,
             connect_timeout_ms: 5_000,
             greeting_timeout_ms: 5_000,
             socket_timeout_ms: 15_000,
@@ -1386,6 +1387,7 @@ mod tests {
             smtp_connect_timeout_ms: 30_000,
             smtp_send_timeout_ms: 300_000,
             write_enabled: true,
+            drafts_enabled: true,
             connect_timeout_ms: 5_000,
             greeting_timeout_ms: 5_000,
             socket_timeout_ms: 5_000,
@@ -1451,6 +1453,8 @@ mod tests {
     async fn connect_authenticated_greenmail(
         config: &ServerConfig,
     ) -> Result<super::ImapSession, String> {
+        // `main` installs the process-wide provider; tests must do it too.
+        let _ = rustls::crypto::ring::default_provider().install_default();
         let account = config
             .get_account("default")
             .map_err(|e| format!("missing default account: {e}"))?;

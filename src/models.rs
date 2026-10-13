@@ -722,6 +722,112 @@ pub struct SmtpVerifyAccountInput {
     pub account_id: String,
 }
 
+// ─── Draft input models ──────────────────────────────────────────────────────
+
+/// Input: create a draft in the account's Drafts folder
+///
+/// The account's configuration decides where the draft lives: EWS when the
+/// account has an EWS config, Microsoft Graph when it has a Graph config,
+/// otherwise the IMAP Drafts folder.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct DraftCreateInput {
+    /// Account identifier (defaults to `"default"`)
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    /// Recipient email addresses (1..50)
+    pub to: Vec<String>,
+    /// CC recipients (optional, max 50)
+    #[serde(default)]
+    pub cc: Vec<String>,
+    /// BCC recipients (optional, max 50); kept on the draft until it is sent
+    #[serde(default)]
+    pub bcc: Vec<String>,
+    /// Email subject (1..998 characters)
+    pub subject: String,
+    /// Plain text body (at least one of body_text or body_html required)
+    pub body_text: Option<String>,
+    /// HTML body (at least one of body_text or body_html required)
+    pub body_html: Option<String>,
+    /// Reply-To address (optional)
+    pub reply_to: Option<String>,
+    /// In-Reply-To message ID for threading (optional)
+    pub in_reply_to: Option<String>,
+    /// References header for threading (optional)
+    pub references: Option<String>,
+    /// File attachments (optional)
+    #[serde(default)]
+    pub attachments: Vec<AttachmentInput>,
+}
+
+/// Input: replace the content of an existing draft
+///
+/// Full replacement: the draft is rebuilt from these fields, and attachments
+/// not listed again are dropped. The draft gets a new `draft_id`; the old id
+/// stops working.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct DraftUpdateInput {
+    /// Account identifier (defaults to `"default"`)
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    /// `draft_id` returned by `draft_create`, `draft_update` or `draft_list`
+    pub draft_id: String,
+    /// Recipient email addresses (1..50)
+    pub to: Vec<String>,
+    /// CC recipients (optional, max 50)
+    #[serde(default)]
+    pub cc: Vec<String>,
+    /// BCC recipients (optional, max 50)
+    #[serde(default)]
+    pub bcc: Vec<String>,
+    /// Email subject (1..998 characters)
+    pub subject: String,
+    /// Plain text body (at least one of body_text or body_html required)
+    pub body_text: Option<String>,
+    /// HTML body (at least one of body_text or body_html required)
+    pub body_html: Option<String>,
+    /// Reply-To address (optional)
+    pub reply_to: Option<String>,
+    /// In-Reply-To message ID for threading (optional)
+    pub in_reply_to: Option<String>,
+    /// References header for threading (optional)
+    pub references: Option<String>,
+    /// File attachments (optional)
+    #[serde(default)]
+    pub attachments: Vec<AttachmentInput>,
+}
+
+/// Input: send an existing draft and remove it from Drafts
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct DraftSendInput {
+    /// Account identifier (defaults to `"default"`)
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    /// `draft_id` of the draft to send
+    pub draft_id: String,
+}
+
+/// Input: delete a draft
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct DraftDeleteInput {
+    /// Account identifier (defaults to `"default"`)
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    /// `draft_id` of the draft to delete
+    pub draft_id: String,
+    /// Explicit confirmation required (must be `true`)
+    pub confirm: bool,
+}
+
+/// Input: list drafts, newest first
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct DraftListInput {
+    /// Account identifier (defaults to `"default"`)
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    /// Maximum drafts to return (1..50, default 20)
+    pub limit: Option<usize>,
+}
+
 // ─── Microsoft Graph input models ────────────────────────────────────────────
 
 /// Input: send an email via Microsoft Graph API

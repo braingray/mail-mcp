@@ -92,6 +92,11 @@ pub struct ServerConfig {
     pub smtp_send_timeout_ms: u64,
     /// Whether write operations (copy, move, delete, flag updates) are enabled
     pub write_enabled: bool,
+    /// Whether the draft tools may create, update and delete drafts
+    /// (`MAIL_DRAFTS_ENABLED`). Independent of `write_enabled`: an agent can
+    /// prepare drafts without being able to move or delete other mail.
+    /// Sending a draft additionally requires `smtp_write_enabled`.
+    pub drafts_enabled: bool,
     /// TCP connection timeout in milliseconds
     pub connect_timeout_ms: u64,
     /// IMAP greeting/TLS handshake timeout in milliseconds
@@ -191,6 +196,7 @@ impl ServerConfig {
                 env_opt_u64("MAIL_SMTP_TIMEOUT_MS")?,
             ),
             write_enabled: parse_bool_env("MAIL_IMAP_WRITE_ENABLED", false)?,
+            drafts_enabled: parse_bool_env("MAIL_DRAFTS_ENABLED", false)?,
             connect_timeout_ms: parse_u64_env("MAIL_IMAP_CONNECT_TIMEOUT_MS", 30_000)?,
             greeting_timeout_ms: parse_u64_env("MAIL_IMAP_GREETING_TIMEOUT_MS", 15_000)?,
             socket_timeout_ms: parse_u64_env("MAIL_IMAP_SOCKET_TIMEOUT_MS", 300_000)?,
@@ -883,6 +889,7 @@ mod tests {
             smtp_connect_timeout_ms: 30_000,
             smtp_send_timeout_ms: 300_000,
             write_enabled: true,
+            drafts_enabled: true,
             connect_timeout_ms: 5_000,
             greeting_timeout_ms: 5_000,
             socket_timeout_ms: 15_000,

@@ -25,7 +25,8 @@ use crate::mime;
 use crate::models::{
     AccountInfo, AccountOnlyInput, AppendMessageInput, AttachmentInput, BulkDeleteInput,
     BulkMoveInput, BulkUpdateFlagsInput, CopyMessageInput, CreateMailboxInput, DeleteMailboxInput,
-    DeleteMessageInput, GetAttachmentInput, GetMessageInput, GetMessageRawInput,
+    DeleteMessageInput, DraftCreateInput, DraftDeleteInput, DraftListInput, DraftSendInput,
+    DraftUpdateInput, GetAttachmentInput, GetMessageInput, GetMessageRawInput,
     GraphSendMessageInput, MailboxInfo, MailboxStatusInfo, MailboxStatusInput, MessageDetail,
     MessageSummary, Meta, MoveMessageInput, RenameMailboxInput, SearchAllMailboxesInput,
     SearchAndDeleteInput, SearchAndMoveInput, SearchMessagesInput, SmtpForwardMessageInput,
@@ -34,6 +35,8 @@ use crate::models::{
 };
 use crate::pagination::{CursorEntry, CursorStore};
 use crate::smtp;
+
+mod drafts;
 
 /// Maximum messages per search result page
 const MAX_SEARCH_LIMIT: usize = 50;
@@ -174,6 +177,9 @@ impl MailImapServer {
                     read_methods.push("ews_search_messages");
                 }
 
+                let drafts_with =
+                    drafts::draft_backend_for(&self.config, id).map(drafts::DraftBackend::as_str);
+
                 serde_json::json!({
                     "account_id": id,
                     "user": user,
@@ -183,6 +189,7 @@ impl MailImapServer {
                     "ews": has_ews,
                     "send_with": send_methods,
                     "read_with": read_methods,
+                    "drafts_with": drafts_with,
                 })
             })
             .collect();
@@ -874,6 +881,78 @@ impl MailImapServer {
         }
         .await;
         finalize_tool(started, "ews_send_message", result)
+    }
+
+    // ─── Draft Tools ─────────────────────────────────────────────────────────
+
+    /// Tool: Create a draft
+    #[tool(
+        name = "draft_create",
+        description = "Save a new email as a draft in the account's Drafts folder (IMAP, EWS or Graph, chosen from the account's configuration). Nothing is sent. Requires MAIL_DRAFTS_ENABLED=true."
+    )]
+    async fn draft_create(
+        &self,
+        Parameters(input): Parameters<DraftCreateInput>,
+    ) -> Result<Json<ToolEnvelope<serde_json::Value>>, ErrorData> {
+        let started = Instant::now();
+        let result = self.draft_create_impl(input).await;
+        finalize_tool(started, "draft_create", result)
+    }
+
+    /// Tool: Replace a draft's content
+    #[tool(
+        name = "draft_update",
+        description = "Replace a draft's recipients, subject, body and attachments (full replacement). Returns a new draft_id; the old one stops working. Requires MAIL_DRAFTS_ENABLED=true."
+    )]
+    async fn draft_update(
+        &self,
+        Parameters(input): Parameters<DraftUpdateInput>,
+    ) -> Result<Json<ToolEnvelope<serde_json::Value>>, ErrorData> {
+        let started = Instant::now();
+        let result = self.draft_update_impl(input).await;
+        finalize_tool(started, "draft_update", result)
+    }
+
+    /// Tool: Send a draft
+    #[tool(
+        name = "draft_send",
+        description = "Send an existing draft and remove it from Drafts. Requires MAIL_DRAFTS_ENABLED=true and MAIL_SMTP_WRITE_ENABLED=true."
+    )]
+    async fn draft_send(
+        &self,
+        Parameters(input): Parameters<DraftSendInput>,
+    ) -> Result<Json<ToolEnvelope<serde_json::Value>>, ErrorData> {
+        let started = Instant::now();
+        let result = self.draft_send_impl(input).await;
+        finalize_tool(started, "draft_send", result)
+    }
+
+    /// Tool: Delete a draft
+    #[tool(
+        name = "draft_delete",
+        description = "Delete a draft. Only acts on drafts. Requires MAIL_DRAFTS_ENABLED=true and confirm=true."
+    )]
+    async fn draft_delete(
+        &self,
+        Parameters(input): Parameters<DraftDeleteInput>,
+    ) -> Result<Json<ToolEnvelope<serde_json::Value>>, ErrorData> {
+        let started = Instant::now();
+        let result = self.draft_delete_impl(input).await;
+        finalize_tool(started, "draft_delete", result)
+    }
+
+    /// Tool: List drafts
+    #[tool(
+        name = "draft_list",
+        description = "List the account's drafts, newest first, with their draft_id. Requires MAIL_DRAFTS_ENABLED=true."
+    )]
+    async fn draft_list(
+        &self,
+        Parameters(input): Parameters<DraftListInput>,
+    ) -> Result<Json<ToolEnvelope<serde_json::Value>>, ErrorData> {
+        let started = Instant::now();
+        let result = self.draft_list_impl(input).await;
+        finalize_tool(started, "draft_list", result)
     }
 
     // ─── Setup Guide Tool ────────────────────────────────────────────────────
