@@ -396,7 +396,7 @@ Guard: every operation on an existing `draft_id` checks that it is a draft befor
 
 Output `data`: `status` (`ok|partial`), `issues`, `account_id`, `backend`, `draft_id` (null with `partial` when an IMAP draft was saved but could not be found again), `message_id` (RFC 5322 Message-ID; IMAP only).
 
-`draft_update` input: `account_id`, `draft_id`, and the same fields as `draft_create`. Full replacement: attachments not listed again are dropped. The new version is created first and the old one deleted second, so a failure in between leaves two drafts, never none (`status: partial`, `previous_draft_removed: false`).
+`draft_update` input: `account_id`, `draft_id`, and the same fields as `draft_create`. Full replacement: attachments not listed again are dropped. The new version is created first and the old one deleted second, so a failure in between leaves two drafts, never none (`status: partial`, `previous_draft_removed: false`). Removed versions are expunged on IMAP and hard-deleted on EWS; Graph moves them to Deleted Items.
 
 Output `data`: `status`, `issues`, `account_id`, `backend`, `draft_id` (new), `previous_draft_id`, `previous_draft_removed`, `message_id`.
 

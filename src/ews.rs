@@ -216,6 +216,8 @@ pub struct EwsSendParams<'a> {
     pub in_reply_to: Option<&'a str>,
     pub references: Option<&'a str>,
     pub reply_to: Option<&'a str>,
+    /// Uploaded with `CreateAttachment` by [`create_draft`]; EWS does not
+    /// take attachments inside `CreateItem`, so [`send_email`] ignores them.
     pub attachments: &'a [EwsAttachment],
 }
 
@@ -276,10 +278,12 @@ pub async fn send_email(
     Ok(())
 }
 
-/// Save a message in the Drafts folder (`CreateItem` with `SaveOnly`).
+/// Save a message in the Drafts folder (`CreateItem` with `SaveOnly`), then
+/// add its attachments with `CreateAttachment`.
 ///
-/// Bcc, Reply-To, threading headers and attachments are stored on the
-/// draft. Returns the new item's id and change key.
+/// Bcc, Reply-To and threading headers are stored on the draft. If the
+/// attachments cannot be added, the half-built draft is deleted and the
+/// error returned. Returns the new item's id.
 pub async fn create_draft(
     token_manager: &TokenManager,
     account_id: &str,
@@ -299,8 +303,23 @@ pub async fn create_draft(
 
     let xml = ews_request(token_manager, account_id, &soap).await?;
     check_response(&xml, "CreateItem")?;
-    parse_item_ref(&xml)
-        .ok_or_else(|| AppError::Internal("EWS CreateItem returned no ItemId".to_owned()))
+    let item = parse_item_ref(&xml)
+        .ok_or_else(|| AppError::Internal("EWS CreateItem returned no ItemId".to_owned()))?;
+
+    if !params.attachments.is_empty() {
+        let soap = render_create_attachment(&item.item_id, params.attachments);
+        let result = match ews_request(token_manager, account_id, &soap).await {
+            Ok(xml) => check_response(&xml, "CreateAttachment"),
+            Err(error) => Err(error),
+        };
+        if let Err(error) = result {
+            if let Err(cleanup) = delete_item(token_manager, account_id, &item.item_id).await {
+                tracing::warn!("EWS: failed to remove incomplete draft: {cleanup}");
+            }
+            return Err(error);
+        }
+    }
+    Ok(item)
 }
 
 /// Read an item's current change key and whether it is a draft.
@@ -409,9 +428,8 @@ pub async fn list_drafts(
 /// Render a `<t:Message>` element for `CreateItem`.
 ///
 /// EWS validates element order against its schema: `Subject`, `Body`,
-/// `Attachments`, `InternetMessageHeaders` (item fields), then
-/// `ToRecipients`, `CcRecipients`, `BccRecipients`, `ReplyTo` (message
-/// fields).
+/// `InternetMessageHeaders` (item fields), then `ToRecipients`,
+/// `CcRecipients`, `BccRecipients`, `ReplyTo` (message fields).
 fn render_message(params: &EwsSendParams<'_>) -> String {
     let to_xml = render_mailboxes(params.to);
     let cc_section = if params.cc.is_empty() {
@@ -437,7 +455,6 @@ fn render_message(params: &EwsSendParams<'_>) -> String {
         ),
         None => String::new(),
     };
-    let attachments_section = render_attachments(params.attachments);
     let headers_section = build_internet_headers(params.in_reply_to, params.references);
 
     let body_escaped = escape_xml(params.body);
@@ -450,7 +467,6 @@ fn render_message(params: &EwsSendParams<'_>) -> String {
         r#"<t:Message>
           <t:Subject>{subject_escaped}</t:Subject>
           <t:Body BodyType="{body_type}">{body_escaped}</t:Body>
-          {attachments_section}
           {headers_section}
           <t:ToRecipients>{to_xml}</t:ToRecipients>
           {cc_section}
@@ -460,11 +476,8 @@ fn render_message(params: &EwsSendParams<'_>) -> String {
     )
 }
 
-/// Render `<t:Attachments>` with inline file attachments, or nothing.
-fn render_attachments(attachments: &[EwsAttachment]) -> String {
-    if attachments.is_empty() {
-        return String::new();
-    }
+/// Render a `CreateAttachment` request adding `attachments` to `item_id`.
+fn render_create_attachment(item_id: &str, attachments: &[EwsAttachment]) -> String {
     let files: String = attachments
         .iter()
         .map(|a| {
@@ -476,7 +489,13 @@ fn render_attachments(attachments: &[EwsAttachment]) -> String {
             )
         })
         .collect();
-    format!("<t:Attachments>{files}</t:Attachments>")
+    format!(
+        r#"<m:CreateAttachment>
+      <m:ParentItemId Id="{}"/>
+      <m:Attachments>{files}</m:Attachments>
+    </m:CreateAttachment>"#,
+        escape_xml(item_id)
+    )
 }
 
 /// Turn an EWS error response into an `AppError`.
@@ -1271,7 +1290,6 @@ mod tests {
         let order = [
             "<t:Subject>",
             "<t:Body ",
-            "<t:Attachments>",
             "<t:InternetMessageHeaders>",
             "<t:ToRecipients>",
             "<t:BccRecipients>",
@@ -1286,9 +1304,20 @@ mod tests {
             );
         }
         assert!(xml.contains("Q3 &lt;plan&gt; &amp; budget"), "{xml}");
-        assert!(xml.contains("<t:Name>a&amp;b.txt</t:Name>"), "{xml}");
-        assert!(xml.contains("<t:Content>aGVsbG8=</t:Content>"), "{xml}");
         assert!(!xml.contains("<t:CcRecipients>"), "{xml}");
+        // Attachments never travel in CreateItem
+        assert!(!xml.contains("Attachment"), "{xml}");
+
+        let upload = render_create_attachment("AAMk+id=", &attachments);
+        assert!(
+            upload.contains(r#"<m:ParentItemId Id="AAMk+id="/>"#),
+            "{upload}"
+        );
+        assert!(upload.contains("<t:Name>a&amp;b.txt</t:Name>"), "{upload}");
+        assert!(
+            upload.contains("<t:Content>aGVsbG8=</t:Content>"),
+            "{upload}"
+        );
     }
 
     #[test]
@@ -1299,7 +1328,6 @@ mod tests {
         params.in_reply_to = None;
         let xml = render_message(&params);
         for absent in [
-            "<t:Attachments>",
             "<t:ReplyTo>",
             "<t:BccRecipients>",
             "<t:InternetMessageHeaders>",

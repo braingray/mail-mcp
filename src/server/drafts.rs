@@ -692,28 +692,45 @@ impl MailImapServer {
         Ok(self.config.get_account(account_id)?.user.clone())
     }
 
-    /// Name of the account's Drafts folder.
-    ///
-    /// Prefers the RFC 6154 `\Drafts` attribute, then well-known names.
-    /// Creates `Drafts` when the account has neither.
+    /// Name of the account's Drafts folder, creating `Drafts` when the
+    /// account has none. Only for writing a new draft.
+    async fn imap_drafts_folder_or_create(
+        &self,
+        session: &mut imap::ImapSession,
+    ) -> AppResult<String> {
+        if let Some(folder) = self.imap_find_drafts_folder(session).await? {
+            return Ok(folder);
+        }
+        imap::create_mailbox(&self.config, session, "Drafts").await?;
+        Ok("Drafts".to_owned())
+    }
+
+    /// Name of the account's existing Drafts folder: `NotFound` when none.
     async fn imap_drafts_folder(&self, session: &mut imap::ImapSession) -> AppResult<String> {
+        self.imap_find_drafts_folder(session)
+            .await?
+            .ok_or_else(|| AppError::NotFound("the account has no Drafts folder yet".to_owned()))
+    }
+
+    /// Locate the Drafts folder: the RFC 6154 `\Drafts` attribute first,
+    /// then well-known names.
+    async fn imap_find_drafts_folder(
+        &self,
+        session: &mut imap::ImapSession,
+    ) -> AppResult<Option<String>> {
         let mailboxes = imap::list_all_mailboxes(&self.config, session).await?;
         let by_attribute = mailboxes.iter().find(|m| {
             m.attributes()
                 .iter()
                 .any(|a| matches!(a, async_imap::types::NameAttribute::Drafts))
         });
-        if let Some(mailbox) = by_attribute {
-            return Ok(mailbox.name().to_owned());
-        }
-        if let Some(mailbox) = mailboxes
-            .iter()
-            .find(|m| imap::is_drafts_folder_name(m.name()))
-        {
-            return Ok(mailbox.name().to_owned());
-        }
-        imap::create_mailbox(&self.config, session, "Drafts").await?;
-        Ok("Drafts".to_owned())
+        Ok(by_attribute
+            .or_else(|| {
+                mailboxes
+                    .iter()
+                    .find(|m| imap::is_drafts_folder_name(m.name()))
+            })
+            .map(|m| m.name().to_owned()))
     }
 
     /// Refuse to act on a message outside the account's Drafts folder.
@@ -722,9 +739,8 @@ impl MailImapServer {
         session: &mut imap::ImapSession,
         msg_id: &MessageId,
     ) -> AppResult<()> {
-        if imap::is_drafts_folder_name(&msg_id.mailbox) {
-            return Ok(());
-        }
+        // Always compare with the resolved folder: a name that merely looks
+        // like drafts (e.g. `Legal/Drafts`) may hold ordinary mail.
         let drafts_folder = self.imap_drafts_folder(session).await?;
         if msg_id.mailbox == drafts_folder {
             return Ok(());
@@ -768,7 +784,7 @@ impl MailImapServer {
         let mut session =
             imap::connect_authenticated(&self.config, account, self.token_manager.as_deref())
                 .await?;
-        let folder = self.imap_drafts_folder(&mut session).await?;
+        let folder = self.imap_drafts_folder_or_create(&mut session).await?;
         imap::append(
             &self.config,
             &mut session,
@@ -903,7 +919,9 @@ impl MailImapServer {
         let mut session =
             imap::connect_authenticated(&self.config, account, self.token_manager.as_deref())
                 .await?;
-        let folder = self.imap_drafts_folder(&mut session).await?;
+        let Some(folder) = self.imap_find_drafts_folder(&mut session).await? else {
+            return Ok((Vec::new(), Vec::new()));
+        };
         let uidvalidity =
             imap::select_mailbox_readonly(&self.config, &mut session, &folder).await?;
         let uids = imap::uid_search(&self.config, &mut session, "ALL").await?;
