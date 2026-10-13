@@ -15,7 +15,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="mail-mcp">
 <meta property="og:title" content="mail-mcp — Email MCP server for AI agents">
-<meta property="og:description" content="Open-source MCP server in Rust: 31 email tools over IMAP, SMTP, Microsoft Graph and EWS, with OAuth2 and multi-account support.">
+<meta property="og:description" content="Open-source MCP server in Rust: 32 email tools over IMAP, SMTP, Microsoft Graph and EWS, with OAuth2 and multi-account support.">
 <meta property="og:url" content="https://mail-mcp.tecnologicachile.cl/">
 <meta property="og:image" content="https://mail-mcp.tecnologicachile.cl/og.png">
 <meta property="og:image:width" content="1200">
@@ -23,7 +23,7 @@
 <meta property="og:image:alt" content="mail-mcp: email MCP server for AI agents">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="mail-mcp — Email MCP server for AI agents">
-<meta name="twitter:description" content="Open-source MCP server in Rust: 31 email tools over IMAP, SMTP, Microsoft Graph and EWS.">
+<meta name="twitter:description" content="Open-source MCP server in Rust: 32 email tools over IMAP, SMTP, Microsoft Graph and EWS.">
 <meta name="twitter:image" content="https://mail-mcp.tecnologicachile.cl/og.png">
 
 <script type="application/ld+json">
@@ -37,7 +37,7 @@
   "applicationCategory": "DeveloperApplication",
   "applicationSubCategory": "MCP server",
   "operatingSystem": "Linux, macOS, Windows",
-  "softwareVersion": "0.4.16",
+  "softwareVersion": "0.4.17",
   "license": "https://opensource.org/licenses/MIT",
   "isAccessibleForFree": true,
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
@@ -47,7 +47,7 @@
   "programmingLanguage": "Rust",
   "keywords": "MCP, Model Context Protocol, email, IMAP, SMTP, Microsoft Graph, EWS, Exchange, OAuth2, Claude, Cursor, AI agents, Rust",
   "featureList": [
-    "31 MCP tools to read, search, send, reply, forward, move, flag and delete email",
+    "32 MCP tools to read, search, send, reply, forward, move, flag and delete email",
     "IMAP and SMTP for any standard mail server",
     "Microsoft Graph API and Exchange Web Services for Microsoft 365 and Outlook.com",
     "Native OAuth2 (XOAUTH2) with token refresh",
@@ -181,7 +181,7 @@ footer{border-top:1px solid var(--line);padding:28px 0 40px;color:var(--muted);f
       <a class="btn" href="https://github.com/tecnologicachile/mail-mcp">View on GitHub</a>
     </div>
     <ul class="chips">
-      <li>31 tools</li><li>OAuth2 (XOAUTH2)</li><li>Multi-account</li><li>Linux, macOS, Windows</li><li>MIT license</li><li>v0.4.16</li>
+      <li>32 tools</li><li>OAuth2 (XOAUTH2)</li><li>Multi-account</li><li>Linux, macOS, Windows</li><li>MIT license</li><li>v0.4.17</li>
     </ul>
   </div>
 </div>
@@ -259,7 +259,7 @@ cd mail-mcp &amp;&amp; cargo build --release</code></pre>
 
 <section id="tools">
   <div class="wrap">
-    <h2>31 MCP tools</h2>
+    <h2>32 MCP tools</h2>
     <h3>Read</h3>
     <ul class="tools">
       <li><code>list_all_accounts</code> accounts and their capabilities</li>
@@ -267,7 +267,8 @@ cd mail-mcp &amp;&amp; cargo build --release</code></pre>
       <li><code>imap_verify_account</code> test connection and auth</li>
       <li><code>imap_list_mailboxes</code> list folders</li>
       <li><code>imap_mailbox_status</code> message counts</li>
-      <li><code>imap_search_messages</code> search with pagination</li>
+      <li><code>imap_search_messages</code> search with pagination, including whole threads by Message-ID</li>
+      <li><code>imap_search_all_mailboxes</code> one search across every folder</li>
       <li><code>imap_get_message</code> parsed message</li>
       <li><code>imap_get_message_raw</code> RFC 822 source</li>
       <li><code>imap_get_attachment</code> save an attachment to disk</li>

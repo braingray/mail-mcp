@@ -15,6 +15,25 @@
 
 Most email MCP servers only do IMAP reads. This one does **everything**: read, search, send, reply, forward, bulk operations, Microsoft Graph API, and Exchange Web Services — with real OAuth2, multi-account, and multi-provider support. Written in Rust for speed and safety.
 
+## What's New in v0.4.17
+
+- **New: `imap_search_all_mailboxes`** by
+  [@tdabasinskas](https://github.com/tdabasinskas) in
+  [#35](https://github.com/tecnologicachile/mail-mcp/pull/35). Runs one search
+  in every selectable mailbox of an account and returns the newest matches,
+  each labelled with its mailbox. Built for providers without an "All Mail"
+  folder (iCloud), where one conversation is spread over INBOX, Sent Messages
+  and project folders. The work is spread over `MAIL_IMAP_SEARCH_CONCURRENCY`
+  connections (default `4`, clamped to `1..=8`); a mailbox that fails is
+  reported and does not abort the search. Scope it with `include_mailboxes` /
+  `exclude_mailboxes`.
+- **Thread search by Message-ID** by
+  [@tdabasinskas](https://github.com/tdabasinskas) in
+  [#34](https://github.com/tecnologicachile/mail-mcp/pull/34).
+  `imap_search_messages` takes a new `thread_message_id` criterion that
+  matches a message and every message whose `In-Reply-To` or `References`
+  carries it, so an agent can pull a whole conversation in one search.
+
 ## What's New in v0.4.16
 
 - **`imap_list_mailboxes` cap is now configurable and visible** by
@@ -466,9 +485,9 @@ Microsoft blocks SMTP on personal accounts. Use Graph API instead:
 
 Get your token in 1 minute with device code flow. See [Account Setup Guide](docs/account-setup.md).
 
-## 31 MCP Tools
+## 32 MCP Tools
 
-### Read (9 tools)
+### Read (10 tools)
 
 | Tool | What it does |
 |------|-------------|

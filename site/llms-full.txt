@@ -4,7 +4,7 @@
 
 - Website: https://mail-mcp.tecnologicachile.cl/
 - Source: https://github.com/tecnologicachile/mail-mcp
-- Latest release: v0.4.16 (https://github.com/tecnologicachile/mail-mcp/releases/latest)
+- Latest release: v0.4.17 (https://github.com/tecnologicachile/mail-mcp/releases/latest)
 - License: MIT
 - Maintainer: Tecnológica Chile (https://tecnologicachile.cl)
 - Platforms: Linux (x86_64), macOS (Intel and Apple Silicon), Windows (x86_64), Docker
@@ -85,9 +85,9 @@ MCP client configuration (Gmail with an app password; works in Claude Code, Clau
 
 For Microsoft 365 and Outlook.com, follow the account setup guide (EWS or Graph device code flow): https://github.com/tecnologicachile/mail-mcp/blob/main/docs/account-setup.md
 
-## The 31 MCP tools
+## The 32 MCP tools
 
-Read: `list_all_accounts`, `imap_list_accounts`, `imap_verify_account`, `imap_list_mailboxes`, `imap_mailbox_status`, `imap_search_messages`, `imap_get_message`, `imap_get_message_raw`, `imap_get_attachment`.
+Read: `list_all_accounts`, `imap_list_accounts`, `imap_verify_account`, `imap_list_mailboxes`, `imap_mailbox_status`, `imap_search_messages`, `imap_search_all_mailboxes`, `imap_get_message`, `imap_get_message_raw`, `imap_get_attachment`.
 
 Write and organize: `imap_update_message_flags`, `imap_copy_message` (also across accounts), `imap_move_message`, `imap_delete_message`, `imap_create_mailbox`, `imap_delete_mailbox`, `imap_rename_mailbox`, `imap_append_message`, `imap_bulk_move`, `imap_bulk_delete`, `imap_bulk_update_flags`, `imap_search_and_move`, `imap_search_and_delete`.
 
