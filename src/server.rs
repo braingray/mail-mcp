@@ -864,6 +864,8 @@ impl MailImapServer {
                 body_type,
                 in_reply_to: input.in_reply_to.as_deref(),
                 references: input.references.as_deref(),
+                reply_to: None,
+                attachments: &[],
             };
             crate::ews::send_email(tm, &input.account_id, &params).await?;
 

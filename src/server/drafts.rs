@@ -8,19 +8,29 @@
 //!   tools (`imap_get_message`, ...) work on it. Sending reads the stored
 //!   bytes, strips `Bcc`, refreshes `Date`, sends through SMTP, archives the
 //!   same bytes to Sent and removes the draft.
+//! - EWS: `CreateItem` with `SaveOnly` in Drafts; `SendItem` sends and moves
+//!   it to Sent Items. `draft_id` is the EWS `ItemId` (works with
+//!   `ews_get_message`).
+//! - Graph: `POST /me/messages` (or `createReply` when `in_reply_to` matches
+//!   a message in the mailbox); `/send` sends and files it in Sent Items.
+//!   Needs the `Mail.ReadWrite` scope.
+//!
+//! `draft_update` is "create the new version, then delete the old one" on
+//! every backend, so the `draft_id` changes on each update.
 //!
 //! Every operation on an existing `draft_id` first checks that the target is
 //! a draft. `MAIL_DRAFTS_ENABLED` therefore lets an agent prepare mail
 //! without being able to delete or send anything else.
 
+use base64::Engine;
 use chrono::Utc;
 use tracing::warn;
 
 use super::{
-    MailImapServer, ToolIssue, decode_attachments, ensure_uidvalidity_matches_readwrite,
-    escape_imap_quoted, parse_and_validate_message_id, require_smtp_write_enabled,
-    status_from_issue_and_counts, validate_account_id, validate_email_no_wrapper_leak,
-    validate_email_recipients,
+    MailImapServer, ToolIssue, decode_attachments, ensure_uidvalidity_matches_readonly,
+    ensure_uidvalidity_matches_readwrite, escape_imap_quoted, parse_and_validate_message_id,
+    require_smtp_write_enabled, status_from_issue_and_counts, validate_account_id,
+    validate_email_no_wrapper_leak, validate_email_recipients,
 };
 use crate::config::ServerConfig;
 use crate::errors::{AppError, AppResult};
@@ -133,6 +143,12 @@ struct ResolvedAttachment {
     filename: String,
     content_type: String,
     content: Vec<u8>,
+}
+
+impl ResolvedAttachment {
+    fn content_base64(&self) -> String {
+        base64::engine::general_purpose::STANDARD.encode(&self.content)
+    }
 }
 
 /// Result of writing a draft
@@ -264,7 +280,14 @@ impl MailImapServer {
                 self.imap_send_draft(&input.account_id, &input.draft_id)
                     .await
             }
-            DraftBackend::Ews | DraftBackend::Graph => Err(unsupported_backend(backend)),
+            DraftBackend::Ews => {
+                self.ews_send_draft(&input.account_id, &input.draft_id)
+                    .await
+            }
+            DraftBackend::Graph => {
+                self.graph_send_draft(&input.account_id, &input.draft_id)
+                    .await
+            }
         }
     }
 
@@ -310,7 +333,14 @@ impl MailImapServer {
 
         let (drafts, issues) = match backend {
             DraftBackend::Imap => self.imap_list_drafts(&input.account_id, limit).await?,
-            DraftBackend::Ews | DraftBackend::Graph => return Err(unsupported_backend(backend)),
+            DraftBackend::Ews => (
+                self.ews_list_drafts(&input.account_id, limit).await?,
+                Vec::new(),
+            ),
+            DraftBackend::Graph => (
+                self.graph_list_drafts(&input.account_id, limit).await?,
+                Vec::new(),
+            ),
         };
 
         let status = status_from_issue_and_counts(&issues, !drafts.is_empty());
@@ -363,7 +393,14 @@ impl MailImapServer {
                 self.imap_create_draft(account_id, content, attachments)
                     .await
             }
-            DraftBackend::Ews | DraftBackend::Graph => Err(unsupported_backend(backend)),
+            DraftBackend::Ews => {
+                self.ews_create_draft(account_id, content, attachments)
+                    .await
+            }
+            DraftBackend::Graph => {
+                self.graph_create_draft(account_id, content, attachments)
+                    .await
+            }
         }
     }
 
@@ -383,9 +420,12 @@ impl MailImapServer {
                     self.token_manager.as_deref(),
                 )
                 .await?;
-                self.imap_ensure_drafts_mailbox(&mut session, &msg_id).await
+                self.imap_ensure_drafts_mailbox(&mut session, &msg_id)
+                    .await?;
+                imap_require_exists(&self.config, &mut session, &msg_id).await
             }
-            DraftBackend::Ews | DraftBackend::Graph => Err(unsupported_backend(backend)),
+            DraftBackend::Ews => self.ews_draft_state(account_id, draft_id).await.map(|_| ()),
+            DraftBackend::Graph => self.graph_ensure_draft(account_id, draft_id).await,
         }
     }
 
@@ -409,8 +449,236 @@ impl MailImapServer {
                     .await?;
                 imap_expunge_message(&self.config, &mut session, &msg_id).await
             }
-            DraftBackend::Ews | DraftBackend::Graph => Err(unsupported_backend(backend)),
+            DraftBackend::Ews => {
+                let tm = self.ews_drafts_token_manager(account_id)?;
+                crate::ews::delete_item(tm, account_id, draft_id).await
+            }
+            DraftBackend::Graph => {
+                let tm = self.graph_drafts_token_manager(account_id)?;
+                crate::graph::delete_message(tm, account_id, draft_id).await
+            }
         }
+    }
+
+    // ─── EWS backend ────────────────────────────────────────────────────────
+
+    fn ews_drafts_token_manager(
+        &self,
+        account_id: &str,
+    ) -> AppResult<&crate::oauth2::TokenManager> {
+        self.ews_token_manager
+            .as_deref()
+            .filter(|tm| tm.has_oauth2(account_id))
+            .ok_or_else(|| {
+                AppError::InvalidInput(format!(
+                    "account '{account_id}' has no EWS OAuth2 token; set MAIL_EWS_{}_REFRESH_TOKEN",
+                    account_id.to_ascii_uppercase()
+                ))
+            })
+    }
+
+    /// Current state of an EWS draft; refuses ids that are not drafts.
+    async fn ews_draft_state(
+        &self,
+        account_id: &str,
+        draft_id: &str,
+    ) -> AppResult<crate::ews::EwsDraftState> {
+        reject_imap_id_for(DraftBackend::Ews, draft_id)?;
+        let tm = self.ews_drafts_token_manager(account_id)?;
+        let state = crate::ews::get_draft_state(tm, account_id, draft_id).await?;
+        if !state.is_draft {
+            return Err(AppError::invalid(
+                "draft_id is not a draft (IsDraft=false); draft tools only act on drafts",
+            ));
+        }
+        Ok(state)
+    }
+
+    async fn ews_create_draft(
+        &self,
+        account_id: &str,
+        content: &DraftContent,
+        attachments: &[ResolvedAttachment],
+    ) -> AppResult<CreatedDraft> {
+        let tm = self.ews_drafts_token_manager(account_id)?;
+        let (body, body_type) = match (&content.body_html, &content.body_text) {
+            (Some(html), _) => (html.as_str(), "HTML"),
+            (None, Some(text)) => (text.as_str(), "Text"),
+            (None, None) => ("", "Text"),
+        };
+        let ews_attachments: Vec<crate::ews::EwsAttachment> = attachments
+            .iter()
+            .map(|a| crate::ews::EwsAttachment {
+                name: a.filename.clone(),
+                content_type: a.content_type.clone(),
+                content_base64: a.content_base64(),
+            })
+            .collect();
+        let params = crate::ews::EwsSendParams {
+            to: &content.to,
+            cc: &content.cc,
+            bcc: &content.bcc,
+            subject: &content.subject,
+            body,
+            body_type,
+            in_reply_to: content.in_reply_to.as_deref(),
+            references: content.references.as_deref(),
+            reply_to: content.reply_to.as_deref(),
+            attachments: &ews_attachments,
+        };
+        let item = crate::ews::create_draft(tm, account_id, &params).await?;
+        Ok(CreatedDraft {
+            draft_id: Some(item.item_id),
+            message_id: None,
+            issues: Vec::new(),
+        })
+    }
+
+    async fn ews_send_draft(
+        &self,
+        account_id: &str,
+        draft_id: &str,
+    ) -> AppResult<(String, serde_json::Value)> {
+        let state = self.ews_draft_state(account_id, draft_id).await?;
+        let tm = self.ews_drafts_token_manager(account_id)?;
+        crate::ews::send_draft(tm, account_id, &state.item).await?;
+        let data = serde_json::json!({
+            "status": "ok",
+            "issues": [],
+            "account_id": account_id,
+            "backend": DraftBackend::Ews.as_str(),
+            "draft_id": draft_id,
+            "saved_to_sent": true,
+            "draft_removed": true,
+        });
+        Ok(("Draft sent via ews".to_owned(), data))
+    }
+
+    async fn ews_list_drafts(
+        &self,
+        account_id: &str,
+        limit: usize,
+    ) -> AppResult<Vec<serde_json::Value>> {
+        let tm = self.ews_drafts_token_manager(account_id)?;
+        let drafts = crate::ews::list_drafts(tm, account_id, limit).await?;
+        Ok(drafts
+            .into_iter()
+            .map(|d| {
+                serde_json::json!({
+                    "draft_id": d.item_id,
+                    "subject": d.subject,
+                    "to": d.to,
+                    "cc": d.cc,
+                    "date": d.date_created,
+                })
+            })
+            .collect())
+    }
+
+    // ─── Graph backend ──────────────────────────────────────────────────────
+
+    /// Graph token for drafts: only the dedicated `MAIL_GRAPH_<ID>_*` config,
+    /// never the generic IMAP/SMTP OAuth2 token.
+    fn graph_drafts_token_manager(
+        &self,
+        account_id: &str,
+    ) -> AppResult<&crate::oauth2::TokenManager> {
+        self.graph_token_manager
+            .as_deref()
+            .filter(|tm| tm.has_oauth2(account_id))
+            .ok_or_else(|| {
+                AppError::InvalidInput(format!(
+                    "account '{account_id}' has no Graph OAuth2 token; set MAIL_GRAPH_{}_REFRESH_TOKEN",
+                    account_id.to_ascii_uppercase()
+                ))
+            })
+    }
+
+    async fn graph_ensure_draft(&self, account_id: &str, draft_id: &str) -> AppResult<()> {
+        reject_imap_id_for(DraftBackend::Graph, draft_id)?;
+        let tm = self.graph_drafts_token_manager(account_id)?;
+        if !crate::graph::is_draft(tm, account_id, draft_id).await? {
+            return Err(AppError::invalid(
+                "draft_id is not a draft (isDraft=false); draft tools only act on drafts",
+            ));
+        }
+        Ok(())
+    }
+
+    async fn graph_create_draft(
+        &self,
+        account_id: &str,
+        content: &DraftContent,
+        attachments: &[ResolvedAttachment],
+    ) -> AppResult<CreatedDraft> {
+        let tm = self.graph_drafts_token_manager(account_id)?;
+        let params = crate::graph::GraphEmailParams {
+            to: content.to.clone(),
+            cc: content.cc.clone(),
+            bcc: content.bcc.clone(),
+            subject: content.subject.clone(),
+            body_text: content.body_text.clone(),
+            body_html: content.body_html.clone(),
+            reply_to: content.reply_to.clone(),
+            in_reply_to: content.in_reply_to.clone(),
+            references: content.references.clone(),
+            attachments: attachments
+                .iter()
+                .map(|a| crate::graph::GraphEmailAttachment {
+                    filename: a.filename.clone(),
+                    content_type: a.content_type.clone(),
+                    content_base64: a.content_base64(),
+                })
+                .collect(),
+            save_to_sent: true,
+        };
+        let id = crate::graph::create_draft(tm, account_id, &params).await?;
+        Ok(CreatedDraft {
+            draft_id: Some(id),
+            message_id: None,
+            issues: Vec::new(),
+        })
+    }
+
+    async fn graph_send_draft(
+        &self,
+        account_id: &str,
+        draft_id: &str,
+    ) -> AppResult<(String, serde_json::Value)> {
+        self.graph_ensure_draft(account_id, draft_id).await?;
+        let tm = self.graph_drafts_token_manager(account_id)?;
+        crate::graph::send_draft(tm, account_id, draft_id).await?;
+        let data = serde_json::json!({
+            "status": "ok",
+            "issues": [],
+            "account_id": account_id,
+            "backend": DraftBackend::Graph.as_str(),
+            "draft_id": draft_id,
+            "saved_to_sent": true,
+            "draft_removed": true,
+        });
+        Ok(("Draft sent via graph".to_owned(), data))
+    }
+
+    async fn graph_list_drafts(
+        &self,
+        account_id: &str,
+        limit: usize,
+    ) -> AppResult<Vec<serde_json::Value>> {
+        let tm = self.graph_drafts_token_manager(account_id)?;
+        let drafts = crate::graph::list_drafts(tm, account_id, limit).await?;
+        Ok(drafts
+            .into_iter()
+            .map(|d| {
+                serde_json::json!({
+                    "draft_id": d.id,
+                    "subject": d.subject,
+                    "to": d.to,
+                    "cc": d.cc,
+                    "date": d.created,
+                })
+            })
+            .collect())
     }
 
     // ─── IMAP backend ───────────────────────────────────────────────────────
@@ -689,11 +957,17 @@ fn require_drafts_enabled(config: &ServerConfig) -> AppResult<()> {
     Ok(())
 }
 
-fn unsupported_backend(backend: DraftBackend) -> AppError {
-    AppError::invalid(format!(
-        "drafts are not supported yet for {} accounts",
-        backend.as_str()
-    ))
+/// IMAP message ids belong to the IMAP backend; passing one to an EWS or
+/// Graph account would only produce a confusing "not found".
+fn reject_imap_id_for(backend: DraftBackend, draft_id: &str) -> AppResult<()> {
+    if MessageId::parse(draft_id).is_ok() {
+        return Err(AppError::invalid(format!(
+            "draft_id is an IMAP message id, but this account keeps drafts via {}; \
+             use a draft_id from draft_create or draft_list",
+            backend.as_str()
+        )));
+    }
+    Ok(())
 }
 
 fn validate_draft_id(draft_id: &str) -> AppResult<()> {
@@ -751,6 +1025,25 @@ async fn imap_find_by_message_id(
     let query = format!("HEADER Message-ID \"{}\"", escape_imap_quoted(message_id)?);
     let uids = imap::uid_search(config, session, &query).await?;
     Ok(uids.first().map(|uid| (uidvalidity, *uid)))
+}
+
+/// `NotFound` unless the message still exists (STORE and EXPUNGE on a
+/// missing UID succeed silently, so a stale id would look deleted).
+async fn imap_require_exists(
+    config: &ServerConfig,
+    session: &mut imap::ImapSession,
+    msg_id: &MessageId,
+) -> AppResult<()> {
+    ensure_uidvalidity_matches_readonly(config, session, msg_id).await?;
+    let uids = imap::uid_search(config, session, &format!("UID {}", msg_id.uid)).await?;
+    if uids.contains(&msg_id.uid) {
+        Ok(())
+    } else {
+        Err(AppError::NotFound(format!(
+            "draft {} not found; it may have been sent, replaced or deleted",
+            msg_id.encode()
+        )))
+    }
 }
 
 /// Flag a message `\Deleted` and expunge it.
@@ -1221,7 +1514,19 @@ mod tests {
         );
         assert_eq!(drafts_with_subject(&server, &final_subject).await.len(), 1);
 
-        // The old id no longer resolves
+        // The old id no longer resolves, for delete or send
+        let stale_delete = server
+            .draft_delete_impl(DraftDeleteInput {
+                account_id: "default".to_owned(),
+                draft_id: first_id.clone(),
+                confirm: true,
+            })
+            .await
+            .expect_err("deleting a replaced draft must fail");
+        assert!(
+            matches!(stale_delete, AppError::NotFound(_)),
+            "{stale_delete}"
+        );
         let gone = server
             .draft_send_impl(DraftSendInput {
                 account_id: "default".to_owned(),
@@ -1314,5 +1619,111 @@ mod tests {
             .await
             .expect("search Sent");
         assert!(archived.is_some(), "sent draft archived in {sent_folder}");
+    }
+
+    /// Draft cycle against a real account configured in the environment
+    /// (same variables as the server). Creates, updates and lists a draft,
+    /// then deletes it, or sends it when `LIVE_DRAFTS_SEND=1`.
+    ///
+    /// ```text
+    /// LIVE_DRAFTS_ACCOUNT=work LIVE_DRAFTS_TO=me@company.com \
+    ///   cargo test live_draft_cycle -- --ignored --nocapture
+    /// ```
+    ///
+    /// Only send to an address you own: the message really goes out.
+    #[tokio::test]
+    #[ignore = "uses a real mail account"]
+    async fn live_draft_cycle() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        let account_id = std::env::var("LIVE_DRAFTS_ACCOUNT").expect("LIVE_DRAFTS_ACCOUNT");
+        let to = std::env::var("LIVE_DRAFTS_TO").expect("LIVE_DRAFTS_TO");
+        let send = std::env::var("LIVE_DRAFTS_SEND").is_ok_and(|v| v == "1");
+        let mut config = ServerConfig::load_from_env().expect("config from env");
+        config.drafts_enabled = true;
+        let server = MailImapServer::new(config, None);
+        let tag = uuid::Uuid::new_v4().simple().to_string();
+        let subject = format!("mail-mcp draft test {tag}");
+
+        let mut input = draft_input(&format!("{subject} v1"), "first version");
+        input.account_id = account_id.clone();
+        input.to = vec![to.clone()];
+        input.bcc = vec![];
+        let (_, created) = server.draft_create_impl(input).await.expect("create");
+        println!("created: {created}");
+        assert_eq!(created["status"], "ok", "{created}");
+        let first_id = created["draft_id"].as_str().expect("draft_id").to_owned();
+
+        let (_, updated) = server
+            .draft_update_impl(DraftUpdateInput {
+                account_id: account_id.clone(),
+                draft_id: first_id.clone(),
+                to: vec![to.clone()],
+                cc: vec![],
+                bcc: vec![],
+                subject: subject.clone(),
+                body_text: Some("final version".to_owned()),
+                body_html: Some("<p>final <b>version</b></p>".to_owned()),
+                reply_to: None,
+                in_reply_to: None,
+                references: None,
+                attachments: draft_input("", "").attachments,
+            })
+            .await
+            .expect("update");
+        println!("updated: {updated}");
+        assert_eq!(updated["status"], "ok", "{updated}");
+        let final_id = updated["draft_id"].as_str().expect("draft_id").to_owned();
+
+        let (_, listed) = server
+            .draft_list_impl(DraftListInput {
+                account_id: account_id.clone(),
+                limit: Some(50),
+            })
+            .await
+            .expect("list");
+        let drafts = listed["drafts"].as_array().expect("drafts");
+        assert!(
+            drafts.iter().any(|d| d["draft_id"] == final_id.as_str()),
+            "updated draft listed: {listed}"
+        );
+        assert!(
+            !drafts.iter().any(|d| d["draft_id"] == first_id.as_str()),
+            "replaced draft gone: {listed}"
+        );
+
+        let stale = server
+            .draft_delete_impl(DraftDeleteInput {
+                account_id: account_id.clone(),
+                draft_id: first_id.clone(),
+                confirm: true,
+            })
+            .await;
+        println!("delete replaced draft: {stale:?}");
+        assert!(stale.is_err(), "replaced draft id must not resolve");
+
+        if send {
+            let (_, sent) = server
+                .draft_send_impl(DraftSendInput {
+                    account_id: account_id.clone(),
+                    draft_id: final_id.clone(),
+                })
+                .await
+                .expect("send");
+            println!("sent: {sent}");
+            assert!(
+                sent["status"] == "ok" || sent["status"] == "partial",
+                "{sent}"
+            );
+        } else {
+            let (_, deleted) = server
+                .draft_delete_impl(DraftDeleteInput {
+                    account_id: account_id.clone(),
+                    draft_id: final_id.clone(),
+                    confirm: true,
+                })
+                .await
+                .expect("delete");
+            println!("deleted: {deleted}");
+        }
     }
 }
