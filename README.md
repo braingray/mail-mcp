@@ -15,6 +15,35 @@
 
 Most email MCP servers only do IMAP reads. This one does **everything**: read, search, send, reply, forward, bulk operations, Microsoft Graph API, and Exchange Web Services — with real OAuth2, multi-account, and multi-provider support. Written in Rust for speed and safety.
 
+## What's New in v0.5.0
+
+- **New: draft tools** (`draft_create`, `draft_update`, `draft_send`,
+  `draft_delete`, `draft_list`) closing
+  [#3](https://github.com/tecnologicachile/mail-mcp/issues/3) and
+  [#17](https://github.com/tecnologicachile/mail-mcp/issues/17). An agent can
+  save a message in the account's own Drafts folder, revise it, and send it
+  later, so a person can review it in their mail client first. The same five
+  tools work on every backend: IMAP + SMTP, Exchange Web Services and
+  Microsoft Graph, picked per account (EWS config, else Graph config, else
+  IMAP). `list_all_accounts` reports the backend as `drafts_with`.
+- **Separate gate: `MAIL_DRAFTS_ENABLED`** (default `false`). It is
+  independent of `MAIL_IMAP_WRITE_ENABLED`: every operation on an existing
+  `draft_id` first checks that the target really is a draft (IMAP Drafts
+  folder, EWS `IsDraft`, Graph `isDraft`), so enabling drafts never grants
+  move or delete on other mail. `draft_send` also requires
+  `MAIL_SMTP_WRITE_ENABLED`.
+- **Graph accounts need the `Mail.ReadWrite` scope** for drafts; see
+  [account setup](docs/account-setup.md). The EWS attachment flow
+  (`CreateItem` with `SaveOnly`, then `CreateAttachment`) follows the approach
+  proposed by [@verdelyi](https://github.com/verdelyi) in
+  [#14](https://github.com/tecnologicachile/mail-mcp/pull/14).
+- **Fix: SMTP messages now carry a Message-ID on the sender's domain**
+  ([#7](https://github.com/tecnologicachile/mail-mcp/issues/7)). Before, lettre
+  sent no Message-ID of its own, so the id returned by the send tools was
+  empty and the Sent copy had none.
+- Verified live on IMAP (Zoho) and Microsoft Graph; the EWS draft path is
+  covered by unit tests.
+
 ## What's New in v0.4.17
 
 - **New: `imap_search_all_mailboxes`** by

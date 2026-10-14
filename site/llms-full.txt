@@ -4,7 +4,7 @@
 
 - Website: https://mail-mcp.tecnologicachile.cl/
 - Source: https://github.com/tecnologicachile/mail-mcp
-- Latest release: v0.4.17 (https://github.com/tecnologicachile/mail-mcp/releases/latest)
+- Latest release: v0.5.0 (https://github.com/tecnologicachile/mail-mcp/releases/latest)
 - License: MIT
 - Maintainer: Tecnológica Chile (https://tecnologicachile.cl)
 - Platforms: Linux (x86_64), macOS (Intel and Apple Silicon), Windows (x86_64), Docker
@@ -14,6 +14,7 @@
 Connect mail-mcp to Claude Code, Claude Desktop, Cursor or any MCP client and the agent can work with an inbox: find a thread, summarize it, draft and send a reply with correct threading headers, file messages into folders, or clean up hundreds of messages in one call. It runs on the user's machine and talks directly to the mail provider, so credentials and messages never pass through a third party.
 
 - Read and search: search by sender, subject, date or full text with cursor pagination; parsed messages with text, sanitized HTML and attachment metadata.
+- Drafts: save, revise, list and send drafts in the account's own Drafts folder, so a person can review a message in their mail client before it goes out.
 - Send, reply, forward: plain text and HTML, CC and BCC, attachments from disk, threaded replies.
 - Organize at scale: move, copy, flag and delete; manage folders; bulk operations on up to 500 messages.
 - Microsoft without SMTP: personal Microsoft accounts block SMTP, so mail-mcp sends through Microsoft Graph or EWS with one OAuth2 token.
@@ -85,13 +86,15 @@ MCP client configuration (Gmail with an app password; works in Claude Code, Clau
 
 For Microsoft 365 and Outlook.com, follow the account setup guide (EWS or Graph device code flow): https://github.com/tecnologicachile/mail-mcp/blob/main/docs/account-setup.md
 
-## The 32 MCP tools
+## The 37 MCP tools
 
 Read: `list_all_accounts`, `imap_list_accounts`, `imap_verify_account`, `imap_list_mailboxes`, `imap_mailbox_status`, `imap_search_messages`, `imap_search_all_mailboxes`, `imap_get_message`, `imap_get_message_raw`, `imap_get_attachment`.
 
 Write and organize: `imap_update_message_flags`, `imap_copy_message` (also across accounts), `imap_move_message`, `imap_delete_message`, `imap_create_mailbox`, `imap_delete_mailbox`, `imap_rename_mailbox`, `imap_append_message`, `imap_bulk_move`, `imap_bulk_delete`, `imap_bulk_update_flags`, `imap_search_and_move`, `imap_search_and_delete`.
 
 Send: `smtp_send_message`, `smtp_reply_message`, `smtp_forward_message`, `smtp_verify_account`, `graph_send_message`.
+
+Drafts: `draft_create`, `draft_update`, `draft_send`, `draft_delete`, `draft_list`. They work the same over IMAP, EWS and Microsoft Graph, and are enabled with `MAIL_DRAFTS_ENABLED=true`.
 
 Exchange Web Services: `ews_search_messages`, `ews_get_message`, `ews_send_message`.
 
@@ -101,7 +104,7 @@ Full contract: https://github.com/tecnologicachile/mail-mcp/blob/main/docs/tool-
 
 ## Security
 
-- Write operations require `MAIL_IMAP_WRITE_ENABLED=true`; sending requires `MAIL_SMTP_WRITE_ENABLED=true`; deletes require `confirm: true`.
+- Write operations require `MAIL_IMAP_WRITE_ENABLED=true`; sending requires `MAIL_SMTP_WRITE_ENABLED=true`; draft tools require `MAIL_DRAFTS_ENABLED=true`; deletes require `confirm: true`.
 - Passwords and tokens are held as secret strings, never logged and never returned by any tool.
 - All connections use TLS; message HTML is sanitized; every output is size-bounded.
 - `MAIL_ATTACHMENT_UPLOAD_DIR` confines which local files a send tool may attach.

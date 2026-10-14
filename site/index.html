@@ -15,7 +15,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="mail-mcp">
 <meta property="og:title" content="mail-mcp — Email MCP server for AI agents">
-<meta property="og:description" content="Open-source MCP server in Rust: 32 email tools over IMAP, SMTP, Microsoft Graph and EWS, with OAuth2 and multi-account support.">
+<meta property="og:description" content="Open-source MCP server in Rust: 37 email tools over IMAP, SMTP, Microsoft Graph and EWS, with OAuth2 and multi-account support.">
 <meta property="og:url" content="https://mail-mcp.tecnologicachile.cl/">
 <meta property="og:image" content="https://mail-mcp.tecnologicachile.cl/og.png">
 <meta property="og:image:width" content="1200">
@@ -23,7 +23,7 @@
 <meta property="og:image:alt" content="mail-mcp: email MCP server for AI agents">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="mail-mcp — Email MCP server for AI agents">
-<meta name="twitter:description" content="Open-source MCP server in Rust: 32 email tools over IMAP, SMTP, Microsoft Graph and EWS.">
+<meta name="twitter:description" content="Open-source MCP server in Rust: 37 email tools over IMAP, SMTP, Microsoft Graph and EWS.">
 <meta name="twitter:image" content="https://mail-mcp.tecnologicachile.cl/og.png">
 
 <script type="application/ld+json">
@@ -37,7 +37,7 @@
   "applicationCategory": "DeveloperApplication",
   "applicationSubCategory": "MCP server",
   "operatingSystem": "Linux, macOS, Windows",
-  "softwareVersion": "0.4.17",
+  "softwareVersion": "0.5.0",
   "license": "https://opensource.org/licenses/MIT",
   "isAccessibleForFree": true,
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
@@ -47,7 +47,7 @@
   "programmingLanguage": "Rust",
   "keywords": "MCP, Model Context Protocol, email, IMAP, SMTP, Microsoft Graph, EWS, Exchange, OAuth2, Claude, Cursor, AI agents, Rust",
   "featureList": [
-    "32 MCP tools to read, search, send, reply, forward, move, flag and delete email",
+    "37 MCP tools to read, search, send, reply, forward, move, flag and delete email",
     "IMAP and SMTP for any standard mail server",
     "Microsoft Graph API and Exchange Web Services for Microsoft 365 and Outlook.com",
     "Native OAuth2 (XOAUTH2) with token refresh",
@@ -181,7 +181,7 @@ footer{border-top:1px solid var(--line);padding:28px 0 40px;color:var(--muted);f
       <a class="btn" href="https://github.com/tecnologicachile/mail-mcp">View on GitHub</a>
     </div>
     <ul class="chips">
-      <li>32 tools</li><li>OAuth2 (XOAUTH2)</li><li>Multi-account</li><li>Linux, macOS, Windows</li><li>MIT license</li><li>v0.4.17</li>
+      <li>37 tools</li><li>OAuth2 (XOAUTH2)</li><li>Multi-account</li><li>Linux, macOS, Windows</li><li>MIT license</li><li>v0.5.0</li>
     </ul>
   </div>
 </div>
@@ -259,7 +259,7 @@ cd mail-mcp &amp;&amp; cargo build --release</code></pre>
 
 <section id="tools">
   <div class="wrap">
-    <h2>32 MCP tools</h2>
+    <h2>37 MCP tools</h2>
     <h3>Read</h3>
     <ul class="tools">
       <li><code>list_all_accounts</code> accounts and their capabilities</li>
@@ -297,6 +297,14 @@ cd mail-mcp &amp;&amp; cargo build --release</code></pre>
       <li><code>smtp_verify_account</code></li>
       <li><code>graph_send_message</code> Microsoft Graph</li>
     </ul>
+    <h3>Drafts</h3>
+    <ul class="tools">
+      <li><code>draft_create</code> save a draft in the account's Drafts folder</li>
+      <li><code>draft_update</code> replace a draft's content</li>
+      <li><code>draft_send</code> send a saved draft</li>
+      <li><code>draft_delete</code></li>
+      <li><code>draft_list</code></li>
+    </ul>
     <h3>Exchange Web Services</h3>
     <ul class="tools">
       <li><code>ews_search_messages</code></li>
@@ -315,7 +323,7 @@ cd mail-mcp &amp;&amp; cargo build --release</code></pre>
   <div class="wrap">
     <h2>Security by default</h2>
     <div class="grid">
-      <div class="card"><h3>Read-only until you say so</h3><p>Write operations need <code>MAIL_IMAP_WRITE_ENABLED=true</code>, sending needs <code>MAIL_SMTP_WRITE_ENABLED=true</code>, and deletes require <code>confirm: true</code>.</p></div>
+      <div class="card"><h3>Read-only until you say so</h3><p>Write operations need <code>MAIL_IMAP_WRITE_ENABLED=true</code>, sending needs <code>MAIL_SMTP_WRITE_ENABLED=true</code>, drafts need <code>MAIL_DRAFTS_ENABLED=true</code>, and deletes require <code>confirm: true</code>.</p></div>
       <div class="card"><h3>Secrets stay secret</h3><p>Passwords and tokens are held as secret strings, never logged and never returned by any tool.</p></div>
       <div class="card"><h3>TLS everywhere</h3><p>All connections use TLS. Message HTML is sanitized and every output is size-bounded.</p></div>
       <div class="card"><h3>Attachment scope</h3><p><code>MAIL_ATTACHMENT_UPLOAD_DIR</code> confines which local files a send tool may attach, so a prompt-injected agent cannot exfiltrate keys.</p></div>
