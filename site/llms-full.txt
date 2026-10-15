@@ -35,7 +35,13 @@ Multiple accounts can be configured at once; every tool takes an `account_id`.
 
 ## Install
 
-Linux and macOS:
+Homebrew (macOS and Linux):
+
+```
+brew install tecnologicachile/tap/mail-mcp
+```
+
+Linux and macOS (shell installer):
 
 ```
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/tecnologicachile/mail-mcp/releases/latest/download/mail-mcp-installer.sh | sh

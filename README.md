@@ -462,13 +462,31 @@ Replace the last line with your email(s). Claude Code will guide you through eac
 
 ## Manual Setup (2 minutes)
 
+Install a prebuilt binary:
+
+```bash
+# macOS and Linux (Homebrew)
+brew install tecnologicachile/tap/mail-mcp
+
+# macOS and Linux (shell installer)
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/tecnologicachile/mail-mcp/releases/latest/download/mail-mcp-installer.sh | sh
+```
+
+```powershell
+# Windows
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/tecnologicachile/mail-mcp/releases/latest/download/mail-mcp-installer.ps1 | iex"
+```
+
+Or build from source:
+
 ```bash
 git clone https://github.com/tecnologicachile/mail-mcp.git
 cd mail-mcp
 cargo build --release
 ```
 
-Add to your MCP client config (Claude Code, Cursor, etc.):
+Add to your MCP client config (Claude Code, Cursor, etc.). With a prebuilt
+binary, use `"command": "mail-mcp"`:
 
 ```json
 {

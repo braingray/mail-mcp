@@ -129,6 +129,12 @@ The repository publishes GitHub Release archives/installers via cargo-dist.
 - Keep installer generation managed by dist config; do not hand-maintain custom installer scripts.
 - Keep Linux x64 target as `x86_64-unknown-linux-gnu` unless explicitly requested otherwise.
 
+### Homebrew Tap
+
+- Formula is published to `tecnologicachile/homebrew-tap` (`brew install tecnologicachile/tap/mail-mcp`) by the `publish-homebrew-formula` job in `release.yml`.
+- That job is copied from what `dist generate` emits, except the tap checkout uses `ssh-key: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}` (a write deploy key on the tap repo only) instead of a `HOMEBREW_TAP_TOKEN` PAT. Keep that change if the job is ever regenerated.
+- Formula `desc` and `homepage` come from `Cargo.toml` (`description`, `homepage`).
+
 ### Tag Publish Flow
 
 - `release.yml` runs on `v*.*.*` tags; `publish-docker.yml` is manual (`workflow_dispatch`) and must be run against the tag afterwards.
