@@ -314,3 +314,13 @@ docker run --rm -i \
 ```
 
 File-based env loading (`--env-file`) takes precedence over `-e` flags.
+
+If `imap_verify_account` or `smtp_verify_account` time out inside a container
+while the same host connects fine, check for an MTU mismatch: TCP connects and
+the SMTP banner arrives, but the TLS handshake stalls because the certificate
+packets exceed the host interface MTU (often 1450 on VPS and overlay networks,
+while Docker bridges default to 1500). Set the bridge MTU to match, either in
+`/etc/docker/daemon.json` (`{ "mtu": 1450 }`) or per Compose network with
+`driver_opts: { com.docker.network.driver.mtu: "1450" }`. A full Docker plus
+nginx deployment walkthrough is in
+[issue #39](https://github.com/tecnologicachile/mail-mcp/issues/39).
