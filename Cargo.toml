@@ -1,6 +1,6 @@
 [package]
 name = "mail-mcp"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 license = "MIT"
 description = "Email MCP server for AI agents over IMAP, SMTP, Microsoft Graph and EWS"
@@ -31,6 +31,7 @@ schemars = "1.0.4"
 secrecy = "0.10.3"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
+sha2 = "0.10"
 thiserror = "2.0.17"
 tokio = { version = "1.47.1", features = ["macros", "rt-multi-thread", "net", "io-std", "time", "signal"] }
 tokio-rustls = "0.26.2"

@@ -78,11 +78,17 @@ impl MailImapServer {
     /// Initializes cursor store with configured TTL and max entries.
     pub fn new(config: ServerConfig, update_notice: Option<String>) -> Self {
         let cursor_store = CursorStore::new(config.cursor_ttl_seconds, config.cursor_max_entries);
+        let token_store = config
+            .oauth2_token_store
+            .clone()
+            .map(|path| Arc::new(crate::oauth2::TokenStore::new(path)));
         let token_manager = if config.oauth2_accounts.is_empty() {
             None
         } else {
             Some(Arc::new(crate::oauth2::TokenManager::new(
                 config.oauth2_accounts.clone(),
+                "oauth2",
+                token_store.clone(),
             )))
         };
         let graph_token_manager = if config.graph_oauth2_accounts.is_empty() {
@@ -90,6 +96,8 @@ impl MailImapServer {
         } else {
             Some(Arc::new(crate::oauth2::TokenManager::new(
                 config.graph_oauth2_accounts.clone(),
+                "graph",
+                token_store.clone(),
             )))
         };
         let ews_token_manager = if config.ews_oauth2_accounts.is_empty() {
@@ -97,6 +105,8 @@ impl MailImapServer {
         } else {
             Some(Arc::new(crate::oauth2::TokenManager::new(
                 config.ews_oauth2_accounts.clone(),
+                "ews",
+                token_store,
             )))
         };
         Self {
@@ -687,7 +697,10 @@ impl MailImapServer {
     // ─── SMTP Tools ──────────────────────────────────────────────────────────
 
     /// Tool: Send a new email via SMTP
-    #[tool(name = "smtp_send_message", description = "Send a new email via SMTP")]
+    #[tool(
+        name = "smtp_send_message",
+        description = "Send a new email via SMTP. Before calling, show the user a full preview (To, CC, BCC, subject, rendered body, attachments) and get explicit confirmation."
+    )]
     async fn smtp_send_message(
         &self,
         Parameters(input): Parameters<SmtpSendMessageInput>,
@@ -700,7 +713,7 @@ impl MailImapServer {
     /// Tool: Reply to a message via SMTP
     #[tool(
         name = "smtp_reply_message",
-        description = "Reply to an existing message via SMTP (fetches original for proper threading)"
+        description = "Reply to an existing message via SMTP (fetches original for proper threading). Before calling, show the user a full preview (To, CC, BCC, subject, rendered body, attachments) and get explicit confirmation."
     )]
     async fn smtp_reply_message(
         &self,
@@ -714,7 +727,7 @@ impl MailImapServer {
     /// Tool: Forward a message via SMTP
     #[tool(
         name = "smtp_forward_message",
-        description = "Forward an existing message via SMTP"
+        description = "Forward an existing message via SMTP. Before calling, show the user a full preview (To, CC, BCC, subject, rendered body, attachments) and get explicit confirmation."
     )]
     async fn smtp_forward_message(
         &self,
@@ -744,7 +757,7 @@ impl MailImapServer {
     /// Tool: Send email via Microsoft Graph API
     #[tool(
         name = "graph_send_message",
-        description = "Send email via Microsoft Graph API (required for personal hotmail/outlook.com accounts where SMTP is blocked)"
+        description = "Send email via Microsoft Graph API (required for personal hotmail/outlook.com accounts where SMTP is blocked). Before calling, show the user a full preview (To, CC, BCC, subject, rendered body, attachments) and get explicit confirmation."
     )]
     async fn graph_send_message(
         &self,
@@ -818,7 +831,7 @@ impl MailImapServer {
     /// Tool: Send email via EWS
     #[tool(
         name = "ews_send_message",
-        description = "Send email via Exchange Web Services. Works on Microsoft tenants that block SMTP and Graph API."
+        description = "Send email via Exchange Web Services. Works on Microsoft tenants that block SMTP and Graph API. Before calling, show the user a full preview (To, CC, BCC, subject, rendered body, attachments) and get explicit confirmation."
     )]
     async fn ews_send_message(
         &self,
@@ -918,7 +931,7 @@ impl MailImapServer {
     /// Tool: Send a draft
     #[tool(
         name = "draft_send",
-        description = "Send an existing draft and remove it from Drafts. Requires MAIL_DRAFTS_ENABLED=true and MAIL_SMTP_WRITE_ENABLED=true."
+        description = "Send an existing draft and remove it from Drafts. Requires MAIL_DRAFTS_ENABLED=true and MAIL_SMTP_WRITE_ENABLED=true. Before calling, show the user the draft's recipients, subject and body and get explicit confirmation."
     )]
     async fn draft_send(
         &self,

@@ -438,6 +438,7 @@ Server-wide:
 - `MAIL_IMAP_SOCKET_TIMEOUT_MS` (default `300000`)
 - `MAIL_IMAP_MAX_MAILBOXES` (default `200`, clamped to `1..=10000`): cap for `imap_list_mailboxes`
 - `MAIL_IMAP_SEARCH_CONCURRENCY` (default `4`, clamped to `1..=8`): parallel connections for `imap_search_all_mailboxes`
+- `MAIL_OAUTH2_TOKEN_STORE` (default unset): file path where rotated OAuth2 refresh tokens are persisted; see `docs/advanced-configuration.md#oauth2-token-store`
 
 Transport (see `docs/advanced-configuration.md#remote-http-transport`):
 

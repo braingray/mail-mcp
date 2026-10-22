@@ -651,9 +651,13 @@ pub struct SmtpSendMessageInput {
     pub bcc: Vec<String>,
     /// Email subject (1..998 characters)
     pub subject: String,
-    /// Plain text body (at least one of body_text or body_html required)
+    /// Plain text body (at least one of body_text or body_html required).
+    /// Separate field from `body_html`: never concatenate the two or wrap
+    /// content in pseudo-tags like `<body_text>`; the server rejects them.
     pub body_text: Option<String>,
-    /// HTML body (at least one of body_text or body_html required)
+    /// HTML body (at least one of body_text or body_html required).
+    /// Separate field from `body_text`: pass the HTML itself, never wrapped
+    /// in pseudo-tags like `<body_html>`; the server rejects them.
     pub body_html: Option<String>,
     /// Reply-To address (optional)
     pub reply_to: Option<String>,
@@ -677,9 +681,13 @@ pub struct SmtpReplyMessageInput {
     pub account_id: String,
     /// Stable message ID of the message to reply to
     pub message_id: String,
-    /// Reply body (plain text)
+    /// Reply body (plain text).
+    /// Separate field from `body_html`: never concatenate the two or wrap
+    /// content in pseudo-tags like `<body_text>`; the server rejects them.
     pub body_text: String,
-    /// Reply body (HTML, optional)
+    /// Reply body (HTML, optional).
+    /// Separate field from `body_text`: pass the HTML itself, never wrapped
+    /// in pseudo-tags like `<body_html>`; the server rejects them.
     pub body_html: Option<String>,
     /// Reply to all recipients (default: false, reply to sender only)
     #[serde(default)]
@@ -706,11 +714,15 @@ pub struct SmtpForwardMessageInput {
     pub to: Vec<String>,
     /// Optional cover note (plain text). The original message is appended
     /// below as a quoted block.
+    /// Separate field from `body_html`: never concatenate the two or wrap
+    /// content in pseudo-tags like `<body_text>`; the server rejects them.
     pub body_text: Option<String>,
     /// Optional cover note (HTML). Unlike `body_text`, this is sent as-is
     /// — the original message is NOT auto-quoted into the HTML part. If you
     /// need an HTML forward with the original embedded, compose it yourself
     /// and use `smtp_send_message`.
+    /// Separate field from `body_text`: pass the HTML itself, never wrapped
+    /// in pseudo-tags like `<body_html>`; the server rejects them.
     pub body_html: Option<String>,
 }
 
@@ -744,9 +756,13 @@ pub struct DraftCreateInput {
     pub bcc: Vec<String>,
     /// Email subject (1..998 characters)
     pub subject: String,
-    /// Plain text body (at least one of body_text or body_html required)
+    /// Plain text body (at least one of body_text or body_html required).
+    /// Separate field from `body_html`: never concatenate the two or wrap
+    /// content in pseudo-tags like `<body_text>`; the server rejects them.
     pub body_text: Option<String>,
-    /// HTML body (at least one of body_text or body_html required)
+    /// HTML body (at least one of body_text or body_html required).
+    /// Separate field from `body_text`: pass the HTML itself, never wrapped
+    /// in pseudo-tags like `<body_html>`; the server rejects them.
     pub body_html: Option<String>,
     /// Reply-To address (optional)
     pub reply_to: Option<String>,
@@ -781,9 +797,13 @@ pub struct DraftUpdateInput {
     pub bcc: Vec<String>,
     /// Email subject (1..998 characters)
     pub subject: String,
-    /// Plain text body (at least one of body_text or body_html required)
+    /// Plain text body (at least one of body_text or body_html required).
+    /// Separate field from `body_html`: never concatenate the two or wrap
+    /// content in pseudo-tags like `<body_text>`; the server rejects them.
     pub body_text: Option<String>,
-    /// HTML body (at least one of body_text or body_html required)
+    /// HTML body (at least one of body_text or body_html required).
+    /// Separate field from `body_text`: pass the HTML itself, never wrapped
+    /// in pseudo-tags like `<body_html>`; the server rejects them.
     pub body_html: Option<String>,
     /// Reply-To address (optional)
     pub reply_to: Option<String>,
@@ -850,9 +870,13 @@ pub struct GraphSendMessageInput {
     pub bcc: Vec<String>,
     /// Email subject (1..998 characters)
     pub subject: String,
-    /// Plain text body (at least one of body_text or body_html required)
+    /// Plain text body (at least one of body_text or body_html required).
+    /// Separate field from `body_html`: never concatenate the two or wrap
+    /// content in pseudo-tags like `<body_text>`; the server rejects them.
     pub body_text: Option<String>,
-    /// HTML body (at least one of body_text or body_html required)
+    /// HTML body (at least one of body_text or body_html required).
+    /// Separate field from `body_text`: pass the HTML itself, never wrapped
+    /// in pseudo-tags like `<body_html>`; the server rejects them.
     pub body_html: Option<String>,
     /// Reply-To address (optional)
     pub reply_to: Option<String>,
@@ -910,9 +934,13 @@ pub struct EwsSendMessageInput {
     pub bcc: Vec<String>,
     /// Email subject
     pub subject: String,
-    /// Plain text body
+    /// Plain text body.
+    /// Separate field from `body_html`: never concatenate the two or wrap
+    /// content in pseudo-tags like `<body_text>`; the server rejects them.
     pub body_text: Option<String>,
-    /// HTML body
+    /// HTML body.
+    /// Separate field from `body_text`: pass the HTML itself, never wrapped
+    /// in pseudo-tags like `<body_html>`; the server rejects them.
     pub body_html: Option<String>,
     /// In-Reply-To message ID for threading (optional)
     pub in_reply_to: Option<String>,

@@ -15,6 +15,25 @@
 
 Most email MCP servers only do IMAP reads. This one does **everything**: read, search, send, reply, forward, bulk operations, Microsoft Graph API, and Exchange Web Services — with real OAuth2, multi-account, and multi-provider support. Written in Rust for speed and safety.
 
+## What's New in v0.6.0
+
+Nothing changes for an existing install unless you opt in.
+
+- **Self-update for shell and PowerShell installs.** The installers now also
+  install `mail-mcp-update`; run it to move to the latest release in place.
+  Homebrew installs keep updating with `brew upgrade`.
+- **Rotated OAuth2 refresh tokens are used, and can be persisted.** Microsoft
+  returns a new refresh token on every refresh; the server used to discard
+  it and keep refreshing with the configured one until that one expired. It
+  now refreshes with the newest token. Set `MAIL_OAUTH2_TOKEN_STORE` to a file
+  path to also keep it across restarts (written `0600`, never fatal if it
+  cannot be written). Changing the refresh token in your config always wins
+  over a stored one.
+- **Send rules in tool and field descriptions.** The preview-and-confirm rule
+  and the "`body_text` and `body_html` are separate fields" rule now also
+  appear on the send tools and body fields, for MCP gateways that do not
+  forward the server instructions.
+
 ## What's New in v0.5.0
 
 - **New: draft tools** (`draft_create`, `draft_update`, `draft_send`,
@@ -472,6 +491,10 @@ brew install tecnologicachile/tap/mail-mcp
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/tecnologicachile/mail-mcp/releases/latest/download/mail-mcp-installer.sh | sh
 ```
 
+The shell and PowerShell installers also install `mail-mcp-update`, which
+updates an existing install to the latest release. With Homebrew, use
+`brew upgrade mail-mcp`.
+
 ```powershell
 # Windows
 powershell -ExecutionPolicy Bypass -c "irm https://github.com/tecnologicachile/mail-mcp/releases/latest/download/mail-mcp-installer.ps1 | iex"
@@ -767,6 +790,7 @@ Use `account_id` in tool calls: `"account_id": "gmail"`, `"account_id": "icloud"
 | `MAIL_IMAP_SOCKET_TIMEOUT_MS` | 300000 | Socket I/O timeout |
 | `MAIL_IMAP_MAX_MAILBOXES` | 200 | Max mailboxes `imap_list_mailboxes` returns (1–10000); the response reports `total` and `truncated` |
 | `MAIL_IMAP_SEARCH_CONCURRENCY` | 4 | Parallel IMAP connections for `imap_search_all_mailboxes` (1–8) |
+| `MAIL_OAUTH2_TOKEN_STORE` | _(unset)_ | File where rotated OAuth2 refresh tokens are saved so they survive a restart (see [OAuth2 token store](docs/advanced-configuration.md#oauth2-token-store)) |
 | `MAIL_MCP_TRANSPORT` | stdio | `stdio`, or `http` to serve MCP streamable HTTP (see [Remote HTTP transport](docs/advanced-configuration.md#remote-http-transport)) |
 | `MAIL_MCP_HTTP_HOST` | 127.0.0.1 | HTTP bind address (IP literal) |
 | `MAIL_MCP_HTTP_PORT` | 8000 | HTTP bind port |

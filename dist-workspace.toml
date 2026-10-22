@@ -9,6 +9,10 @@ cargo-dist-version = "0.31.0"
 ci = "github"
 # The installers to generate for each app
 installers = ["shell", "powershell", "npm", "homebrew"]
+# Ship `mail-mcp-update` with the shell and PowerShell installers so local
+# installs can update in place. Homebrew and npm installs keep using their
+# own package manager.
+install-updater = true
 # The publishers to run in CI.
 #
 # We generate the npm tarball (so `installers = [...]` above keeps "npm")

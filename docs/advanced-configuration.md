@@ -302,6 +302,33 @@ accounts. Keep the loopback default unless the port is reachable only from
 something that authenticates callers: an MCP gateway with OAuth, a reverse
 proxy with auth, or a firewall that admits only that gateway.
 
+## OAuth2 Token Store
+
+Microsoft returns a new refresh token every time an access token is
+refreshed. The server always refreshes with the newest one it has, but by
+default keeps it in memory only: after a restart it starts again from the
+`*_REFRESH_TOKEN` in the environment, which Microsoft eventually expires
+(`AADSTS700082`, typically after 90 days). To keep the rotated token across restarts, point the server at a
+file:
+
+```bash
+MAIL_OAUTH2_TOKEN_STORE=/var/lib/mail-mcp/tokens.json   # default: unset
+```
+
+- The file is JSON, written via a temp file and rename, mode `0600` on Unix.
+  It holds live refresh tokens: keep it out of backups you would not trust
+  with the account password.
+- Entries are keyed by token type (`oauth2`, `graph`, `ews`) and account id,
+  and record a SHA-256 fingerprint of the environment token they derive from.
+  If you replace the environment token (for example after re-authenticating),
+  the stored entry is ignored and the new token is used.
+- Failures never stop the server: an unreadable file is treated as empty and
+  a failed write is logged once, leaving rotation in memory.
+- Use one file per server process; two processes sharing a file overwrite
+  each other's entries.
+- Under systemd with `ProtectSystem=strict`, the directory must be writable,
+  e.g. `StateDirectory=mail-mcp` or `ReadWritePaths=`.
+
 ## Docker-Specific Configuration
 
 When running in Docker, ensure environment variables are passed correctly:

@@ -121,6 +121,10 @@ pub struct ServerConfig {
     /// (canonicalized at startup). `None` = no restriction, any readable
     /// file may be attached.
     pub attachment_upload_dir: Option<PathBuf>,
+    /// File where rotated OAuth2 refresh tokens are persisted
+    /// (`MAIL_OAUTH2_TOKEN_STORE`). `None` = rotated tokens live in memory
+    /// only and the env token is used again after a restart.
+    pub oauth2_token_store: Option<PathBuf>,
 }
 
 impl ServerConfig {
@@ -217,6 +221,11 @@ impl ServerConfig {
             attachment_upload_dir: parse_upload_dir(
                 env::var("MAIL_ATTACHMENT_UPLOAD_DIR").ok().as_deref(),
             )?,
+            oauth2_token_store: env::var("MAIL_OAUTH2_TOKEN_STORE")
+                .ok()
+                .map(|s| s.trim().to_owned())
+                .filter(|s| !s.is_empty())
+                .map(PathBuf::from),
         })
     }
 
@@ -899,6 +908,7 @@ mod tests {
             search_concurrency: super::DEFAULT_SEARCH_CONCURRENCY,
             attachment_download_dir: None,
             attachment_upload_dir: None,
+            oauth2_token_store: None,
         }
     }
 

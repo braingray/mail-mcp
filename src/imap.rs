@@ -1369,6 +1369,7 @@ mod tests {
             search_concurrency: crate::config::DEFAULT_SEARCH_CONCURRENCY,
             attachment_download_dir: None,
             attachment_upload_dir: None,
+            oauth2_token_store: None,
         }
     }
 
@@ -1397,6 +1398,7 @@ mod tests {
             search_concurrency: crate::config::DEFAULT_SEARCH_CONCURRENCY,
             attachment_download_dir: None,
             attachment_upload_dir: None,
+            oauth2_token_store: None,
         }
     }
 
