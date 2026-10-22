@@ -302,6 +302,42 @@ accounts. Keep the loopback default unless the port is reachable only from
 something that authenticates callers: an MCP gateway with OAuth, a reverse
 proxy with auth, or a firewall that admits only that gateway.
 
+### Running Behind an MCP Gateway
+
+mail-mcp works behind MCP gateways that proxy streamable HTTP servers
+(tested with IBM ContextForge 1.1). Run one instance per set of accounts in
+HTTP mode on loopback and register its URL in the gateway, which then handles
+authentication and decides which users see which instance. Updating then
+happens once on the server; clients need no changes.
+
+Compared to a local stdio install, a few things behave differently:
+
+- **Server instructions may not reach the client.** Some gateways, ContextForge
+  among them, drop the `instructions` returned by `initialize`, so the send
+  protocol and the hard rules on `body_text`/`body_html` never reach the
+  model. Since v0.6.0 the essential rules are also in the send tool
+  descriptions and the body field descriptions, which gateways do forward, and
+  the server still rejects bodies containing tool-call wrapper markers. If you
+  rely on the full guidance, repeat it in the client's own instructions (for
+  example `CLAUDE.md`).
+- **Tool names are prefixed** by most gateways (for example
+  `mail-work-smtp-send-message`). Client permission rules or hooks that match
+  `mcp__mail__*` stop matching.
+- **`file_path` refers to the server's disk.** That includes the env files
+  holding every account password. Set `MAIL_ATTACHMENT_UPLOAD_DIR` to an empty
+  directory so `file_path` attachments are refused, and send attachments with
+  `content_base64` instead. `imap_get_attachment` also saves on the server;
+  use its `include_base64` (up to 256 KiB by default) or
+  `extract_attachment_text` on `imap_get_message` to get the content to the
+  client. Large attachments are not practical through a gateway.
+- **Persist rotated OAuth2 tokens** with `MAIL_OAUTH2_TOKEN_STORE` (see
+  [OAuth2 Token Store](#oauth2-token-store)), one file per instance, so
+  Microsoft accounts keep working across restarts.
+- **The gateway's own limits apply.** Long calls such as
+  `imap_search_all_mailboxes` on a large account can exceed the gateway's tool
+  timeout (60 seconds by default in ContextForge), and its rate limits count
+  every tool call.
+
 ## OAuth2 Token Store
 
 Microsoft returns a new refresh token every time an access token is

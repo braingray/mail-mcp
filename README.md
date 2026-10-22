@@ -32,7 +32,9 @@ Nothing changes for an existing install unless you opt in.
 - **Send rules in tool and field descriptions.** The preview-and-confirm rule
   and the "`body_text` and `body_html` are separate fields" rule now also
   appear on the send tools and body fields, for MCP gateways that do not
-  forward the server instructions.
+  forward the server instructions. See
+  [Running behind an MCP gateway](docs/advanced-configuration.md#running-behind-an-mcp-gateway)
+  for what else changes when mail-mcp sits behind a gateway.
 
 ## What's New in v0.5.0
 
