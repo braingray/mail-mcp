@@ -15,6 +15,23 @@
 
 Most email MCP servers only do IMAP reads. This one does **everything**: read, search, send, reply, forward, bulk operations, Microsoft Graph API, and Exchange Web Services — with real OAuth2, multi-account, and multi-provider support. Written in Rust for speed and safety.
 
+## What's New in v0.6.1
+
+- **Message content stays out of the logs at `RUST_LOG=info`.** At that
+  level the rmcp library logged every JSON-RPC response in full, which with
+  the HTTP transport put message subjects and bodies in the server log (the
+  journal, for a systemd service). When `RUST_LOG` sets a global level of
+  `info` or more verbose, rmcp is now capped at `warn` unless `RUST_LOG`
+  names it (for example `RUST_LOG=info,rmcp=info` while debugging). The
+  stdio transport did not log responses, and with `RUST_LOG` unset nothing
+  changes. If you run v0.6.0 or earlier over HTTP, set
+  `RUST_LOG=info,rmcp=warn`.
+- **EWS setup scope fixed.** Microsoft now rejects
+  `https://outlook.office365.com/EWS.AccessAsUser.All` with `AADSTS70011`
+  (`invalid_scope`). The Quickstart uses
+  `https://outlook.office.com/EWS.AccessAsUser.All`. Existing EWS tokens keep
+  working; this only matters when getting a new one.
+
 ## What's New in v0.6.0
 
 Nothing changes for an existing install unless you opt in.
@@ -468,7 +485,7 @@ Install and configure the mail-mcp MCP server from https://github.com/tecnologic
 2. Add the MCP server to .claude.json with the binary path
 3. For Microsoft accounts: use EWS (simplest) — run device code flow with
    client_id d3590ed6-52b3-4102-aeff-aad2292ab01c and scope
-   https://outlook.office365.com/EWS.AccessAsUser.All offline_access
+   https://outlook.office.com/EWS.AccessAsUser.All offline_access
    Then configure MAIL_EWS_<ID>_USER and MAIL_EWS_<ID>_REFRESH_TOKEN
 4. For Gmail: configure MAIL_IMAP + MAIL_SMTP with App Password from
    https://myaccount.google.com/apppasswords

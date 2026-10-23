@@ -333,6 +333,12 @@ Compared to a local stdio install, a few things behave differently:
 - **Persist rotated OAuth2 tokens** with `MAIL_OAUTH2_TOKEN_STORE` (see
   [OAuth2 Token Store](#oauth2-token-store)), one file per instance, so
   Microsoft accounts keep working across restarts.
+- **Keep message content out of the logs.** At `info`, the rmcp library
+  logs every JSON-RPC response of the HTTP transport in full, subjects and
+  bodies included. Since v0.6.1, when `RUST_LOG` sets a global level of
+  `info` or more verbose, rmcp is capped at `warn` unless `RUST_LOG` names
+  it. On v0.6.0 and earlier, set `RUST_LOG=info,rmcp=warn` yourself. Only set
+  `rmcp=info` or lower for short debugging sessions.
 - **The gateway's own limits apply.** Long calls such as
   `imap_search_all_mailboxes` on a large account can exceed the gateway's tool
   timeout (60 seconds by default in ContextForge), and its rate limits count
