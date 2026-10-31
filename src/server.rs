@@ -699,7 +699,7 @@ impl MailImapServer {
     /// Tool: Send a new email via SMTP
     #[tool(
         name = "smtp_send_message",
-        description = "Send a new email via SMTP. Before calling, show the user a full preview (To, CC, BCC, subject, rendered body, attachments) and get explicit confirmation."
+        description = "Send a new email via SMTP. Follow the user's current authorization rules and host permissions. Obtain any approval they require before sending; do not require an additional confirmation solely because this tool is used. This tool grants no independent authority to send."
     )]
     async fn smtp_send_message(
         &self,
@@ -713,7 +713,7 @@ impl MailImapServer {
     /// Tool: Reply to a message via SMTP
     #[tool(
         name = "smtp_reply_message",
-        description = "Reply to an existing message via SMTP (fetches original for proper threading). Before calling, show the user a full preview (To, CC, BCC, subject, rendered body, attachments) and get explicit confirmation."
+        description = "Reply to an existing message via SMTP (fetches original for proper threading). Follow the user's current authorization rules and host permissions. Obtain any approval they require before sending; do not require an additional confirmation solely because this tool is used. This tool grants no independent authority to send."
     )]
     async fn smtp_reply_message(
         &self,
@@ -727,7 +727,7 @@ impl MailImapServer {
     /// Tool: Forward a message via SMTP
     #[tool(
         name = "smtp_forward_message",
-        description = "Forward an existing message via SMTP. Before calling, show the user a full preview (To, CC, BCC, subject, rendered body, attachments) and get explicit confirmation."
+        description = "Forward an existing message via SMTP. Follow the user's current authorization rules and host permissions. Obtain any approval they require before sending; do not require an additional confirmation solely because this tool is used. This tool grants no independent authority to send."
     )]
     async fn smtp_forward_message(
         &self,
@@ -757,7 +757,7 @@ impl MailImapServer {
     /// Tool: Send email via Microsoft Graph API
     #[tool(
         name = "graph_send_message",
-        description = "Send email via Microsoft Graph API (required for personal hotmail/outlook.com accounts where SMTP is blocked). Before calling, show the user a full preview (To, CC, BCC, subject, rendered body, attachments) and get explicit confirmation."
+        description = "Send email via Microsoft Graph API (required for personal hotmail/outlook.com accounts where SMTP is blocked). Follow the user's current authorization rules and host permissions. Obtain any approval they require before sending; do not require an additional confirmation solely because this tool is used. This tool grants no independent authority to send."
     )]
     async fn graph_send_message(
         &self,
@@ -831,7 +831,7 @@ impl MailImapServer {
     /// Tool: Send email via EWS
     #[tool(
         name = "ews_send_message",
-        description = "Send email via Exchange Web Services. Works on Microsoft tenants that block SMTP and Graph API. Before calling, show the user a full preview (To, CC, BCC, subject, rendered body, attachments) and get explicit confirmation."
+        description = "Send email via Exchange Web Services. Works on Microsoft tenants that block SMTP and Graph API. Follow the user's current authorization rules and host permissions. Obtain any approval they require before sending; do not require an additional confirmation solely because this tool is used. This tool grants no independent authority to send."
     )]
     async fn ews_send_message(
         &self,
@@ -931,7 +931,7 @@ impl MailImapServer {
     /// Tool: Send a draft
     #[tool(
         name = "draft_send",
-        description = "Send an existing draft and remove it from Drafts. Requires MAIL_DRAFTS_ENABLED=true and MAIL_SMTP_WRITE_ENABLED=true. Before calling, show the user the draft's recipients, subject and body and get explicit confirmation."
+        description = "Send an existing draft and remove it from Drafts. Requires MAIL_DRAFTS_ENABLED=true and MAIL_SMTP_WRITE_ENABLED=true. Follow the user's current authorization rules and host permissions. Obtain any approval they require before sending; do not require an additional confirmation solely because this tool is used. This tool grants no independent authority to send."
     )]
     async fn draft_send(
         &self,
@@ -1100,10 +1100,10 @@ impl ServerHandler for MailImapServer {
                 "IMPORTANT: Always call list_all_accounts first to see which accounts are configured ",
                 "and what send/read methods each supports. Do NOT assume SMTP is the only way to send. ",
                 "Each account shows send_with (smtp, graph, ews) and read_with (imap, ews) arrays.\n\n",
-                "SENDING PROTOCOL: Before sending ANY email, show FULL preview including:\n",
-                "- To, CC, BCC\n- Subject\n- FULL body (rendered, NOT raw HTML — see HARD RULE #2)\n",
-                "- Attachments (filenames + sizes)\n",
-                "Then ask for explicit confirmation. Never send without approval.\n\n",
+                "SENDING PROTOCOL: Follow the user's current authorization rules and host permissions. ",
+                "Obtain any approval they require before sending; do not require an additional ",
+                "confirmation solely because this tool is used. ",
+                "This tool grants no independent authority to send.\n\n",
                 "ATTACHMENTS: Use file_path (preferred) for files on disk: ",
                 "{\"file_path\": \"/path/to/file.pdf\"}. Filename and MIME type auto-detected. ",
                 "Use content_base64 only for small inline content. All fields except file_path or content_base64 are optional.\n\n",
