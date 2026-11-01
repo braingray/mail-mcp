@@ -687,7 +687,7 @@ impl MailImapServer {
     /// account can send, otherwise the IMAP login.
     fn imap_draft_from(&self, account_id: &str) -> AppResult<String> {
         if let Some(smtp_config) = self.config.smtp_accounts.get(account_id) {
-            return Ok(smtp_config.effective_from().to_owned());
+            return smtp_config.effective_from_header();
         }
         Ok(self.config.get_account(account_id)?.user.clone())
     }
@@ -1282,7 +1282,7 @@ mod tests {
     #[test]
     fn rendered_draft_keeps_bcc_and_prepares_cleanly() {
         let composition = smtp::EmailComposition {
-            from: "me@example.com".to_owned(),
+            from: "Gipity <me@example.com>".to_owned(),
             to: vec!["a@example.com".to_owned()],
             cc: vec![],
             bcc: vec!["hidden@example.com".to_owned()],
@@ -1301,6 +1301,8 @@ mod tests {
         let p = prepare_draft_for_send(&draft.rfc822, DATE).unwrap();
         let sent = String::from_utf8(p.rfc822).unwrap();
         assert!(!sent.contains("hidden@example.com"), "{sent}");
+        assert!(sent.contains("From: Gipity <me@example.com>"), "{sent}");
+        assert_eq!(p.envelope_from, "me@example.com");
         assert_eq!(p.recipients, vec!["a@example.com", "hidden@example.com"]);
         assert_eq!(p.message_id.as_deref(), Some(draft.message_id.as_str()));
     }
@@ -1432,6 +1434,7 @@ mod tests {
                 auth_method: crate::config::AuthMethod::Password,
                 save_sent: Some(true),
                 from_email: None,
+                from_name: None,
             },
         );
         config

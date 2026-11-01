@@ -3424,7 +3424,7 @@ impl MailImapServer {
             self.config.attachment_upload_dir.as_deref(),
         )?;
 
-        let from_addr = smtp_config.effective_from().to_owned();
+        let from_addr = smtp_config.effective_from_header()?;
 
         let composition = smtp::EmailComposition {
             from: from_addr,
@@ -3579,7 +3579,7 @@ impl MailImapServer {
         }
 
         let composition = smtp::EmailComposition {
-            from: smtp_config.effective_from().to_owned(),
+            from: smtp_config.effective_from_header()?,
             to: to.clone(),
             cc,
             bcc: vec![],
@@ -3695,7 +3695,7 @@ impl MailImapServer {
         let smtp_config = self.config.get_smtp_account(&input.account_id)?;
 
         let composition = smtp::EmailComposition {
-            from: smtp_config.effective_from().to_owned(),
+            from: smtp_config.effective_from_header()?,
             to: input.to.clone(),
             cc: vec![],
             bcc: vec![],
