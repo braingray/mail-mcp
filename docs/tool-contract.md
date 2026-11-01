@@ -450,3 +450,17 @@ Transport (see `docs/advanced-configuration.md#remote-http-transport`):
 ## Implementation Notes for Next Artifact
 
 Next artifact will generate Rust types and schema definitions from this contract, then register all tools in an `rmcp` stdio server skeleton with unified error handling.
+
+### SMTP sender display name
+
+`MAIL_SMTP_<ID>_FROM_NAME` optionally sets the sender display name for that SMTP
+account, for example `MAIL_SMTP_WORK_FROM_NAME=Gipity`. Keep `_FROM_EMAIL` as a
+bare email address; it still falls back to `_USER`. The resulting header is
+`From: Gipity <sender@example.com>`. Authentication and SMTP envelope addresses
+are unchanged. Spaces, punctuation and Unicode names are encoded by the mail
+library. Leading/trailing spaces are trimmed, blank means no name, and control
+characters (including CR/LF) are rejected at startup.
+
+Applies to SMTP new sends, replies, forwards, and IMAP draft creation/update.
+Sending an existing draft preserves its stored From header; update/recreate it
+to use a changed display name. This SMTP option does not configure Graph/EWS.

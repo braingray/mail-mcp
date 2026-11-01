@@ -89,6 +89,8 @@ pub struct SmtpAccountConfig {
     /// mailboxes where auth uses a personal account but the From should be
     /// the group address).
     pub from_email: Option<String>,
+    /// Optional sender display name (`MAIL_SMTP_<ID>_FROM_NAME`).
+    pub from_name: Option<String>,
 }
 
 impl SmtpAccountConfig {
@@ -99,6 +101,15 @@ impl SmtpAccountConfig {
     /// repeated at every call site (send, reply, reply-all, forward).
     pub fn effective_from(&self) -> &str {
         self.from_email.as_deref().unwrap_or(&self.user)
+    }
+
+    /// Format the From header separately from the bare sender/self address.
+    pub fn effective_from_header(&self) -> AppResult<String> {
+        let address = self
+            .effective_from()
+            .parse::<Address>()
+            .map_err(|e| AppError::InvalidInput(format!("invalid SMTP sender address: {e}")))?;
+        Ok(Mailbox::new(self.from_name.clone(), address).to_string())
     }
 }
 
@@ -478,6 +489,65 @@ fn sanitize_cdata(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sender_display_name_preserves_address_envelope_and_draft_headers() {
+        let mut config = SmtpAccountConfig {
+            account_id: "test".to_owned(),
+            host: "smtp.example.com".to_owned(),
+            port: 465,
+            user: "login@example.com".to_owned(),
+            pass: None,
+            security: SmtpSecurity::Tls,
+            auth_method: AuthMethod::Password,
+            save_sent: None,
+            from_email: Some("sender@example.com".to_owned()),
+            from_name: None,
+        };
+        for name in [None, Some("Gipity"), Some("Support, Team"), Some("Équipe")] {
+            config.from_name = name.map(str::to_owned);
+            assert_eq!(config.effective_from(), "sender@example.com");
+            let comp = EmailComposition {
+                from: config.effective_from_header().unwrap(),
+                to: vec!["recipient@example.com".to_owned()],
+                cc: vec![],
+                bcc: vec![],
+                subject: "Test".to_owned(),
+                body_text: Some("Body".to_owned()),
+                body_html: None,
+                reply_to: None,
+                in_reply_to: None,
+                references: None,
+                attachments: vec![],
+            };
+            for keep_bcc in [false, true] {
+                let message = build_message(&comp, keep_bcc).unwrap();
+                assert_eq!(
+                    message.envelope().from().unwrap().to_string(),
+                    "sender@example.com"
+                );
+                let raw = message.formatted();
+                let parsed = mailparse::parse_mail(&raw).unwrap();
+                let from = parsed
+                    .headers
+                    .iter()
+                    .find(|h| h.get_key_ref().eq_ignore_ascii_case("From"))
+                    .unwrap();
+                let addresses = mailparse::addrparse_header(from).unwrap();
+                let mailparse::MailAddr::Single(sender) = &addresses[0] else {
+                    panic!("expected single sender")
+                };
+                assert_eq!(sender.addr, "sender@example.com");
+                assert_eq!(sender.display_name.as_deref(), name);
+            }
+        }
+        config.from_email = None;
+        config.from_name = Some("Gipity".to_owned());
+        assert_eq!(
+            config.effective_from_header().unwrap(),
+            "Gipity <login@example.com>"
+        );
+    }
 
     #[test]
     fn smtp_security_parse_accepts_valid_values() {

@@ -587,6 +587,9 @@ fn load_smtp_accounts(
             _ => None,
         };
 
+        let from_name =
+            parse_smtp_from_name(env::var(format!("{prefix}FROM_NAME")).ok().as_deref())?;
+
         smtp_accounts.insert(
             account_id.clone(),
             SmtpAccountConfig {
@@ -599,11 +602,24 @@ fn load_smtp_accounts(
                 auth_method,
                 save_sent,
                 from_email,
+                from_name,
             },
         );
     }
 
     Ok(smtp_accounts)
+}
+
+/// Parse a display name without allowing control characters in message headers.
+fn parse_smtp_from_name(value: Option<&str>) -> AppResult<Option<String>> {
+    let Some(value) = value else { return Ok(None) };
+    if value.chars().any(char::is_control) {
+        return Err(AppError::InvalidInput(
+            "SMTP FROM_NAME must not contain control characters".to_owned(),
+        ));
+    }
+    let value = value.trim();
+    Ok((!value.is_empty()).then(|| value.to_owned()))
 }
 
 /// Read a required SMTP environment variable, with a clear error message.
@@ -856,11 +872,35 @@ fn resolve_smtp_send_timeout(new_var: Option<u64>, legacy_var: Option<u64>) -> u
 mod tests {
     use super::{
         AuthMethod, DEFAULT_MAX_MAILBOXES, MAX_MAILBOXES_LIMIT, ServerConfig, clamp_max_mailboxes,
-        is_valid_email, parse_bool_value, parse_upload_dir, provider_auto_saves_sent,
-        resolve_smtp_send_timeout,
+        is_valid_email, parse_bool_value, parse_smtp_from_name, parse_upload_dir,
+        provider_auto_saves_sent, resolve_smtp_send_timeout,
     };
     use crate::smtp::{SmtpAccountConfig, SmtpSecurity};
     use std::collections::{BTreeMap, HashMap};
+
+    #[test]
+    fn smtp_from_name_normalizes_optional_names_and_rejects_controls() {
+        assert_eq!(parse_smtp_from_name(None).unwrap(), None);
+        assert_eq!(parse_smtp_from_name(Some("   ")).unwrap(), None);
+        assert_eq!(
+            parse_smtp_from_name(Some(" Gipity ")).unwrap().as_deref(),
+            Some("Gipity")
+        );
+        assert_eq!(
+            parse_smtp_from_name(Some("Équipe, Support"))
+                .unwrap()
+                .as_deref(),
+            Some("Équipe, Support")
+        );
+        for value in [
+            "Gipity\r\nBcc: other@example.com",
+            "Gipity\n",
+            "Gipity\0",
+            "Gipity\t",
+        ] {
+            assert!(parse_smtp_from_name(Some(value)).is_err());
+        }
+    }
 
     /// Build a ServerConfig with one SMTP account at `host` whose per-account
     /// SAVE_SENT is `account_save_sent`, and a global `MAIL_SMTP_SAVE_SENT`
@@ -884,6 +924,7 @@ mod tests {
                 auth_method: AuthMethod::Password,
                 save_sent: account_save_sent,
                 from_email: None,
+                from_name: None,
             },
         );
         ServerConfig {

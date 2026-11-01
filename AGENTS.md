@@ -241,6 +241,11 @@ The repository publishes GitHub Release archives/installers via cargo-dist.
   shared/group mailboxes where auth uses a personal account but the From
   should be the group address), set this to the group address. When unset,
   the From address defaults to `_USER`. Affects send, reply, and forward.
+- `MAIL_SMTP_<ID>_FROM_NAME`: optional sender display name, separate from the
+  bare `_FROM_EMAIL` / `_USER` address. Trimmed; blank means no display name;
+  control characters are rejected at startup. Affects SMTP send/reply/forward
+  and newly created or updated IMAP drafts. Stored drafts retain their From
+  header when sent. Does not change SMTP authentication or envelope addresses.
 - `MAIL_IMAP_MAX_MAILBOXES`: cap on how many mailboxes `imap_list_mailboxes`
   returns (default `200`, clamped to `1..=10000`). The response always carries
   `total` and `truncated`, so a client can tell a capped list from a complete one.
